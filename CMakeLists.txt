@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.20)
+
+project(hello-sdl3)
+add_executable(app) # WIN32 - hide the console like this add_executable(app WIN32)
+
+list(APPEND CMAKE_PREFIX_PATH
+    "${CMAKE_SOURCE_DIR}/include/SDL3-3.1.3/x86_64-w64-mingw32/lib/cmake/SDL3"
+    "${CMAKE_SOURCE_DIR}/include/SDL3_image-3.2.4/x86_64-w64-mingw32/lib/cmake/SDL3_image"
+)
+
+find_package(SDL3 CONFIG REQUIRED)
+find_package(SDL3_image CONFIG REQUIRED)
+
+file(GLOB SRC_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
+file(GLOB SDL3_INCLUDE_DIRS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/include/SDL3-3.1.3/x86_64-w64-mingw32/include/SDL3")
+file(GLOB SDL3_IMAGE_INCLUDE_DIRS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/include/SDL3_image-3.2.4/x86_64-w64-mingw32/include/SDL3_image")
+file(GLOB FFMPEG_INCLUDE_DIRS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/include/ffmpeg-8.0/include")
+
+target_sources(app PRIVATE ${SRC_FILES})
+
+target_include_directories(app PRIVATE ${SDL3_INCLUDE_DIRS} ${SDL3_IMAGE_INCLUDE_DIRS} ${FFMPEG_INCLUDE_DIRS})
+
+target_link_directories(app PRIVATE ${CMAKE_SOURCE_DIR}/include/ffmpeg-8.0/lib)
+
+target_link_libraries(app PRIVATE SDL3::SDL3 SDL3_image::SDL3_image avcodec avformat avutil swscale)
+target_compile_definitions(app PRIVATE SDL_MAIN_USE_CALLBACKS)
+target_link_options(app PRIVATE -static)
