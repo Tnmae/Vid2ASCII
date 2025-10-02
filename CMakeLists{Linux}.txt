@@ -1,6 +1,8 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.25)
 
-project(hello)
+set(CMAKE_CXX_STANDARD 20)
+
+project(Vid2ASCII)
 
 add_executable(${CMAKE_PROJECT_NAME})
 
@@ -14,9 +16,11 @@ file(GLOB SRC_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
 target_sources(${PROJECT_NAME} PRIVATE ${SRC_FILES})
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${FFMPEG_INCLUDE_DIRS})
+target_include_directories(
+  ${PROJECT_NAME} PRIVATE ${FFMPEG_INCLUDE_DIRS}
+                          ${CMAKE_CURRENT_SOURCE_DIR}/include/headers)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3 SDL3_image::SDL3_image
-                                              ${FFMPEG_LIBRARIES})
+                                              ${FFMPEG_LIBRARIES} dl)
 
-target_compile_options(${PROJECT_NAME} PRIVATE -static)
+target_compile_options(${PROJECT_NAME} PRIVATE -static -g)

@@ -1,14 +1,7 @@
 #ifdef __linux
 
-#include <SDL3/SDL.h>
-#include <SDL3_image/SDL_image.h>
-#include <iostream>
-
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/avutil.h>
-}
+#include "../include/headers/sdl.hpp"
+#include "../include/headers/video.hpp"
 
 int main(int argc, char *argv[]) {
   if (!SDL_Init(SDL_INIT_VIDEO)) {

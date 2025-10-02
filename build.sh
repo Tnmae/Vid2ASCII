@@ -14,4 +14,4 @@ cmake -S .. -B .
 
 make
 
-./hello
+./Vid2ASCII
