@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.20)
+
+project(hello)
+
+add_executable(${CMAKE_PROJECT_NAME})
+
+find_package(PkgConfig REQUIRED)
+find_package(SDL3 REQUIRED)
+find_package(SDL3_image REQUIRED)
+
+pkg_check_modules(FFMPEG REQUIRED libavformat libavcodec libavutil libswscale)
+
+file(GLOB SRC_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
+
+target_sources(${PROJECT_NAME} PRIVATE ${SRC_FILES})
+
+target_include_directories(${PROJECT_NAME} PRIVATE ${FFMPEG_INCLUDE_DIRS})
+
+target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3 SDL3_image::SDL3_image
+                                              ${FFMPEG_LIBRARIES})
+
+target_compile_options(${PROJECT_NAME} PRIVATE -static)
