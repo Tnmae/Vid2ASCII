@@ -2,6 +2,7 @@
 setlocal
 
 del CMakeLists{Linux}.txt
+del build.sh
 
 set "Folder=.\include\ffmpeg-8.0"
 
