@@ -1,6 +1,8 @@
 @echo off
 setlocal
 
+del CMakeLists{Linux}.txt
+
 set "Folder=.\include\ffmpeg-8.0"
 
 echo Test to see if ffmpeg exists
@@ -12,7 +14,9 @@ if exist "%Folder%" (
     tar -xvf testing.7z -C .\include\
     ren ".\include\ffmpeg-8.0-full_build-shared" "ffmpeg-8.0"
     del testing.7z
-    echo Missing dependencies downloaded
+    echo FFmpeg downloaded
 )
+
+ren "CMakeLists{WIN32}.txt" "CMakeLists.txt"
 
 cmake -G "MinGW Makefiles" -S . -B build
