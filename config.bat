@@ -12,8 +12,8 @@ if %ERRORLEVEL% == 1 (
     curl -L -o testing.7z https://github.com/niXman/mingw-builds-binaries/releases/download/15.2.0-rt_v13-rev0/x86_64-15.2.0-release-win32-seh-msvcrt-rt_v13-rev0.7z
     tar -xvf testing.7z -C .\
     del .\testing.7z
-    set "var2=%cd%"
-    set "PATH=%PATH%;%var2%\mingw64\bin\"
+    set "var1=%cd%"
+    set "PATH=%PATH%;%var1%\mingw64\bin\"
     echo mingw64 install complete
     echo g++ downloaded and added to path for current terminal session
 )else (
