@@ -1,5 +1,5 @@
 .vscode
 build/
 include/ffmpeg-8.0/
-post_push.sh
-pre_push.sh
+postpush.sh
+prepush.sh
