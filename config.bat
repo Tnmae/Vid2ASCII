@@ -4,6 +4,8 @@ setlocal
 del CMakeLists{Linux}.txt
 del build.sh
 
+#add script to add a check if the make existing in user's system is linux make or gnu win32 make
+
 echo Test to see if mingw toolkit, gnu make and cmake exist
 
 where g++ >nul 2>&1
