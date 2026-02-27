@@ -9,4 +9,4 @@ set "PATH=%PATH%;%var2%\cmake\bin\"
 
 cd build
 cmake --build .
-.\app.exe
+.\Vid2ASCII.exe
