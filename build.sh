@@ -1,31 +1,24 @@
 #!/bin/bash
 
-#add script to check which pacakge manager this linux distribution uses
-
-#if distro comes out to be arch
-alias cm='sudo pacman'
-
-if ! command -v ffmpeg >/dev/null 2>&1; then
-  echo "ffmpeg not found, downloading dependancy"
-  cm -S ffmpeg
+# script to check which package manager this linux distribution uses
+if command -v pacman >/dev/null 2>&1; then
+  sudo pacman -S gcc cmake sdl3 sdl3_image sdl3_ttf ffmpeg
+elif command -v apt >/dev/null 2>&1; then
+  sudo apt install g++ cmake libsdl3-dev libsdl3-image-dev libsdl3-ttf-dev ffmpeg
+elif command -v dnf >/dev/null 2>&1; then
+  echo "Make sure RPM Fusion is enabled in your fedora system"
+  sudo dnf install gcc-c++ cmake SDL3-devel SDL3_image-devel SDL3_ttf-devel ffmpeg
+elif command -v yum >/dev/null 2>&1; then
+  sudo zypper install gcc-c++ cmake SDL3-devel SDL3_image-devel SDL3_ttf-devel ffmpeg
+elif command -v emerge >/dev/null 2>&1; then
+  sudo emerge -av sys-devel/gcc dev-util/cmake \
+    media-libs/libsdl3 media-libs/sdl3-image \
+    media-libs/sdl3-ttf media-video/ffmpeg
 else
-  echo "ffmpeg found"
+  echo "Could not figure out a package manager. Manually install the packages using a preferred package manager"
 fi
 
-if ! pacman -Ql sdl3 >/dev/null 2>&1; then
-  echo "sdl3 not found, downloading dependancy"
-  cm -S sdl3
-else
-  echo "sdl3 found"
-fi
-
-if ! pacman -Ql sdl3_image >/dev/null 2>&1; then
-  echo "sdl3_image not found, handling dependancy"
-  cm -S sdl3_image
-else
-  echo "sdl3_image found"
-fi
-
+#build commands
 rm -rf CMakeLists{WIN32}.txt config.bat build.bat
 
 mv CMakeLists{Linux}.txt CMakeLists.txt
