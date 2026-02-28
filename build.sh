@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # script to check which package manager this linux distribution uses
 if command -v pacman >/dev/null 2>&1; then
