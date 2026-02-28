@@ -15,9 +15,38 @@ find_package(SDL3_ttf CONFIG REQUIRED)
 
 file(GLOB SRC_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
+file(GLOB SDL3_DLLS
+    "${CMAKE_SOURCE_DIR}/include/SDL3/x86_64-w64-mingw32/bin/*.dll"
+)
+
+file(GLOB SDL3_IMAGE_DLLS
+    "${CMAKE_SOURCE_DIR}/include/SDL3_image/x86_64-w64-mingw32/bin/*.dll"
+)
+
+file(GLOB SDL3_TTF_DLLS
+    "${CMAKE_SOURCE_DIR}/include/SDL3_ttf/x86_64-w64-mingw32/bin/*.dll"
+)
+
+file(GLOB FFMPEG_DLLS
+    "${CMAKE_SOURCE_DIR}/include/ffmpeg-8.0/bin/*.dll"
+)
+
+add_custom_target(copy_dlls ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${SDL3_DLLS}
+    ${SDL3_IMAGE_DLLS}
+    ${SDL3_TTF_DLLS}
+    ${FFMPEG_DLLS}
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>
+)
+
+
 target_sources(${PROJECT_NAME} PRIVATE ${SRC_FILES})
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${SDL3_INCLUDE_DIRS} ${SDL3_IMAGE_INCLUDE_DIRS} ${SDL3_TTF_INCLUDE_DIRS} ${FFMPEG_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include/headers)
+target_include_directories(${PROJECT_NAME} PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/headers
+    ${CMAKE_SOURCE_DIR}/include/ffmpeg-8.0/include
+)
 
 target_link_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include/ffmpeg-8.0/lib)
 
@@ -29,6 +58,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
                         avformat
                         avutil
                         swscale)
+
+add_dependencies(${PROJECT_NAME} copy_dlls)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE SDL_MAIN_USE_CALLBACKS)
 target_compile_options(${PROJECT_NAME} PRIVATE -g)
