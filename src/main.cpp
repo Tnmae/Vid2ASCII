@@ -9,6 +9,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  TTF_Font *mFont = nullptr;
+
   SDL_Window *window = SDL_CreateWindow("SDL3 + SDL3_image + FFmpeg Test", 800,
                                         600, SDL_WINDOW_RESIZABLE);
   SDL_Renderer *renderer = SDL_CreateRenderer(window, nullptr);
@@ -45,8 +47,6 @@ int main(int argc, char *argv[]) {
     SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
     SDL_RenderClear(renderer);
 
-    // In a full app, you would decode video frames into a texture here
-
     SDL_RenderPresent(renderer);
     SDL_Delay(16);
   }
@@ -60,6 +60,7 @@ int main(int argc, char *argv[]) {
 
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
+#include <SDL3_ttf/SDL_ttf.h>
 #include <iostream>
 
 // FFmpeg headers

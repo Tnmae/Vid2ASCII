@@ -27,6 +27,7 @@
         ffmpeg
         sdl3
         sdl3-image
+        sdl3-ttf
       ];
     };
   };
