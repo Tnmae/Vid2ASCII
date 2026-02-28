@@ -19,7 +19,7 @@ if %ERRORLEVEL% == 1 (
     echo mingw64 install complete
     echo g++ downloaded and added to path for current terminal session
 )else (
-    echo check passed successfully!
+    echo g++ is preinstalled!!
 )
 
 where cmake >nul 2>&1
@@ -33,7 +33,7 @@ if %ERRORLEVEL% == 1 (
     set "PATH=%PATH%;%var2%\cmake\bin\"
     echo CMake install complete and added to path for current terminal session    
 )else (
-    echo Check passed successfully!
+    echo cmake is preinstalled!!!
 )
 
 where make >nul 2>&1
@@ -42,9 +42,10 @@ if %ERRORLEVEL% == 1 (
     curl -L -o make-3.80.exe https://gnuwin32.sourceforge.net/downlinks/make.php
     .\make-3.80.exe
     del make-3.80.exe
+    set "PATH=%PATH%;C:\Program Files (x86)\GnuWin32\bin"
     echo make install complete
 )else (
-    echo check passed successfully!
+    echo make is preinstalled!!
 )
 
 set "Folder=.\include\ffmpeg-8.0"
