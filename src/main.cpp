@@ -15,7 +15,7 @@ static SDL_Renderer *renderer = nullptr;
 constexpr int columns = (int)WIDTH/10;
 constexpr int rows = (int)HEIGHT/10;
 
-static char frame[ rows * (columns + 1) + 1 ];
+static uint8_t frame[ rows * columns ];
 
 constexpr char lowercase_alphabets[] = "@%#*+=-:. ";
 
@@ -39,21 +39,37 @@ SDL_AppResult RenderText(SDL_Texture *mFontTextTexture, float x, float y, float 
 
 void generate_row(int y) {
   for ( int x = 0 ; x < columns ; x++ ) {
-    frame[ y * ( columns + 1) + x ] = lowercase_alphabets[rand() % 10];
+    frame[ y * columns + x ] = rand() % 10;
   }
-  frame[y * ( columns + 1 ) + columns ] = '\n';
 }
 
 void generate_frame() {
-   
   for ( int y = 0 ; y < rows ; y++ ) {
     generate_row(y);
   }
-
-  frame[ (columns + 1) * rows ] = '\0';
 }
 
 
+void generate_texture(SDL_Texture *& mFontTextTexture, TTF_Font* font, char glyph[]) {
+  SDL_Surface *textSurface = TTF_RenderText_Blended_Wrapped(font, glyph, 0, SDL_Color{255, 255, 255, 255}, 0);
+  mFontTextTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+  SDL_DestroySurface(textSurface);
+}
+
+void build_ascii_cache(std::vector<SDL_Texture* > &textures, TTF_Font *font) {
+  for (int i = 0 ; i < 10 ; i++ ) {
+    char glyph[2] = { lowercase_alphabets[i] , '\0'};
+    generate_texture(textures[i], font, glyph);
+  }
+}
+
+void RenderASCII(std::vector<SDL_Texture* > &textures, TTF_Font *font) {
+  for (int y = 0 ; y < rows ; y++ ) {
+    for (int x = 0 ; x < columns ; x++) {
+      RenderText(textures[frame[y * columns + x]], (float)x*10, (float)y*10, 10, 10);
+    }
+  }
+}
 
 int main(int argc, char *argv[]) {
 
@@ -100,7 +116,6 @@ int main(int argc, char *argv[]) {
   
   TTF_Font* font = TTF_OpenFont(ttfPath.c_str(), 60);
 
-  generate_frame();
 
   if (!font) {
     std::cerr << "Error loading ttf file : " << SDL_GetError() << '\n';
@@ -111,6 +126,8 @@ int main(int argc, char *argv[]) {
 
   SDL_Color fg = {255, 255, 255, 255};
 
+  std::vector<SDL_Texture* > glyph_texture(10);
+  build_ascii_cache(glyph_texture, font);
 
   while (running) {
 
@@ -125,8 +142,9 @@ int main(int argc, char *argv[]) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
     SDL_RenderClear(renderer);
 
-    CreateTextTexture(font, mFontTextTexture, frame, fg);
-    RenderText(mFontTextTexture, 0, 0, WIDTH, HEIGHT);
+    generate_frame();
+
+    RenderASCII(glyph_texture, font);
 
     SDL_RenderPresent(renderer);
 
