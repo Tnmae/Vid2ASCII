@@ -28,6 +28,10 @@
         sdl3
         sdl3-image
         sdl3-ttf
+
+        valgrind 
+        kdePackages.kcachegrind 
+        perf
       ];
     };
   };

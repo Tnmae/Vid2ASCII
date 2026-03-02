@@ -3,21 +3,21 @@
 #include "sdl.hpp"
 #include "video.hpp"
 #include <random>
+#include <chrono>
+#include <thread>
+#include <vector>
 
 #define WIDTH 900
 #define HEIGHT 600
 
 static SDL_Renderer *renderer = nullptr;
 
-constexpr int col_size = (int)HEIGHT/10;
-constexpr int row_size = (int)WIDTH/10;
+constexpr int columns = (int)WIDTH/10;
+constexpr int rows = (int)HEIGHT/10;
 
-char frame[ (row_size + 1) * col_size + 1];
+static char frame[ rows * (columns + 1) + 1 ];
 
 constexpr char lowercase_alphabets[] = "@%#*+=-:. ";
-
-constexpr char uppercase_alphabets[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
 
 SDL_AppResult CreateTextTexture(TTF_Font* font, SDL_Texture*& mFontTextTexture, std::string text, SDL_Color fg) {
 
@@ -35,6 +35,24 @@ SDL_AppResult RenderText(SDL_Texture *mFontTextTexture, float x, float y, float 
   SDL_RenderTexture(renderer, mFontTextTexture, nullptr, &textRect);
   return SDL_APP_CONTINUE;
 }
+
+
+void generate_row(int y) {
+  for ( int x = 0 ; x < columns ; x++ ) {
+    frame[ y * ( columns + 1) + x ] = lowercase_alphabets[rand() % 10];
+  }
+  frame[y * ( columns + 1 ) + columns ] = '\n';
+}
+
+void generate_frame() {
+   
+  for ( int y = 0 ; y < rows ; y++ ) {
+    generate_row(y);
+  }
+
+  frame[ (columns + 1) * rows ] = '\0';
+}
+
 
 
 int main(int argc, char *argv[]) {
@@ -82,6 +100,8 @@ int main(int argc, char *argv[]) {
   
   TTF_Font* font = TTF_OpenFont(ttfPath.c_str(), 60);
 
+  generate_frame();
+
   if (!font) {
     std::cerr << "Error loading ttf file : " << SDL_GetError() << '\n';
     return 5;
@@ -91,7 +111,10 @@ int main(int argc, char *argv[]) {
 
   SDL_Color fg = {255, 255, 255, 255};
 
+
   while (running) {
+
+    Uint64 start = SDL_GetTicks();
 
     SDL_PollEvent(&event);
 
@@ -99,23 +122,19 @@ int main(int argc, char *argv[]) {
       running = false;
     }
 
-
-    for (int i = 0 ; i < col_size ; i++) {
-      for (int j = 0 ; j < row_size ; j++ ) {
-        frame[j + i * (row_size + 1)] = lowercase_alphabets[rand() % 9];
-      }
-      frame[i * (row_size + 1) + row_size] = '\n';
-    }
-    frame[col_size * (row_size + 1)] = '\0';
-
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
     SDL_RenderClear(renderer);
 
     CreateTextTexture(font, mFontTextTexture, frame, fg);
-
     RenderText(mFontTextTexture, 0, 0, WIDTH, HEIGHT);
 
     SDL_RenderPresent(renderer);
+
+    Uint64 end = SDL_GetTicks();
+
+    Uint64 time_elapsed = (end - start == 0) ? 1 : end-start;
+    Uint64 fps = 1000/time_elapsed;
+    std::cout << fps << '\n';
 
   }
 
