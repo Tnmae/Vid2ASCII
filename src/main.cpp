@@ -6,18 +6,27 @@
 #include <chrono>
 #include <thread>
 #include <vector>
+#include <atomic>
 
 #define WIDTH 900
 #define HEIGHT 600
 
+#define GLYPH_SIZE 15
+
 static SDL_Renderer *renderer = nullptr;
 
-constexpr int columns = (int)WIDTH/10;
-constexpr int rows = (int)HEIGHT/10;
+constexpr int columns = (int)WIDTH/GLYPH_SIZE;
+constexpr int rows = (int)HEIGHT/GLYPH_SIZE;
 
-static uint8_t frame[ rows * columns ];
+constexpr int num_iter = rows * columns;
 
-constexpr char lowercase_alphabets[] = "@%#*+=-:. ";
+static uint8_t frame[ num_iter ];
+static uint8_t back_buffer[ num_iter ];
+
+constexpr char luminosity[] = "@%#*+=-:. ";
+
+std::atomic_bool new_frame_ready = false;
+std::atomic_bool running = true;
 
 SDL_AppResult CreateTextTexture(TTF_Font* font, SDL_Texture*& mFontTextTexture, std::string text, SDL_Color fg) {
 
@@ -37,43 +46,56 @@ SDL_AppResult RenderText(SDL_Texture *mFontTextTexture, float x, float y, float 
 }
 
 
-void generate_row(int y) {
-  for ( int x = 0 ; x < columns ; x++ ) {
-    frame[ y * columns + x ] = rand() % 10;
+void generate_frame(std::mt19937 &generator, std::uniform_int_distribution<std::mt19937::result_type> &rng) {
+  /*
+   This function will take raw pixel data and convert a luminosity map from it, and then from that generate a back buffer containing ASCII character corresponding to it's respective luminosity
+   */
+  for ( int y = 0 ; y < num_iter ; y++ ) {
+    back_buffer[y] = rng(generator);
   }
 }
 
-void generate_frame() {
-  for ( int y = 0 ; y < rows ; y++ ) {
-    generate_row(y);
-  }
-}
-
-
-void generate_texture(SDL_Texture *& mFontTextTexture, TTF_Font* font, char glyph[]) {
+void generate_glyph_texture(SDL_Texture *& glyph_texture, TTF_Font* font, char* glyph) {
   SDL_Surface *textSurface = TTF_RenderText_Blended_Wrapped(font, glyph, 0, SDL_Color{255, 255, 255, 255}, 0);
-  mFontTextTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+  glyph_texture = SDL_CreateTextureFromSurface(renderer, textSurface);
   SDL_DestroySurface(textSurface);
 }
 
-void build_ascii_cache(std::vector<SDL_Texture* > &textures, TTF_Font *font) {
+void build_glyph_cache(std::vector<SDL_Texture* > &textures, TTF_Font *font) {
   for (int i = 0 ; i < 10 ; i++ ) {
-    char glyph[2] = { lowercase_alphabets[i] , '\0'};
-    generate_texture(textures[i], font, glyph);
+    char glyph[2] = { luminosity[i] , '\0'};
+    generate_glyph_texture(textures[i], font, glyph);
   }
 }
 
-void RenderASCII(std::vector<SDL_Texture* > &textures, TTF_Font *font) {
+void RenderFrame(std::vector<SDL_Texture* > &textures, TTF_Font *font) {
   for (int y = 0 ; y < rows ; y++ ) {
+    int row_num = y * columns;
     for (int x = 0 ; x < columns ; x++) {
-      RenderText(textures[frame[y * columns + x]], (float)x*10, (float)y*10, 10, 10);
+      RenderText(textures[frame[row_num + x]], (float)x*GLYPH_SIZE, (float)y*GLYPH_SIZE, GLYPH_SIZE, GLYPH_SIZE);
     }
   }
 }
 
-int main(int argc, char *argv[]) {
+void worker_function() {
+  std::random_device rdev;
+  std::mt19937 generator(rdev());
+  std::uniform_int_distribution<std::mt19937::result_type> range(0, 9);
 
-  srand(time(0));
+  while (running) {
+    generate_frame(generator, range);
+
+    new_frame_ready.store(true, std::memory_order_release);
+
+    while (new_frame_ready.load(std::memory_order_acquire) && running) {
+      std::this_thread::yield();
+    }
+  }
+}
+
+
+
+int main(int argc, char *argv[]) {
 
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     std::cerr << "SDL_Init failed to initialize with error: " << SDL_GetError() << "\n";
@@ -98,7 +120,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Window created successfully\n";
   }
 
-  renderer = SDL_CreateRenderer(window, NULL);
+  renderer = SDL_CreateRenderer(window, nullptr);
 
   if (!renderer) {
     std::cerr << "Error creating renderer : " << SDL_GetError() << '\n';
@@ -107,15 +129,12 @@ int main(int argc, char *argv[]) {
     std::cout << "Renderer created successfully\n";
   }
 
-  bool running = true;
+  bool running1 = true;
   SDL_Event event;
-
-  SDL_Texture* mFontTextTexture = nullptr;
 
   std::string ttfPath = "../resources/Roboto-Regular.ttf";
   
   TTF_Font* font = TTF_OpenFont(ttfPath.c_str(), 60);
-
 
   if (!font) {
     std::cerr << "Error loading ttf file : " << SDL_GetError() << '\n';
@@ -127,38 +146,53 @@ int main(int argc, char *argv[]) {
   SDL_Color fg = {255, 255, 255, 255};
 
   std::vector<SDL_Texture* > glyph_texture(10);
-  build_ascii_cache(glyph_texture, font);
+  build_glyph_cache(glyph_texture, font);
 
-  while (running) {
+  auto start = std::chrono::high_resolution_clock::now();
+  int frame_count = 0;
 
-    Uint64 start = SDL_GetTicks();
+  std::thread worker_thread(worker_function);
 
-    SDL_PollEvent(&event);
-
-    if (event.type == SDL_EVENT_QUIT) {
-      running = false;
+  while (running1) {
+    while (SDL_PollEvent(&event)) {
+      if (event.type == SDL_EVENT_QUIT) {
+        running1 = false;
+      }
     }
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
     SDL_RenderClear(renderer);
 
-    generate_frame();
+    if (new_frame_ready.load(std::memory_order_acquire)) {
+      memcpy(frame, back_buffer, sizeof(frame));
+      new_frame_ready.store(false);
+    }
 
-    RenderASCII(glyph_texture, font);
+    RenderFrame(glyph_texture, font);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    frame_count++;
+    double time_elapsed = std::chrono::duration<double>(end-start).count();
+    if (time_elapsed > 1.0) {
+      std::cout << "fps: " << frame_count/time_elapsed << '\n';
+      frame_count = 0;
+      start = end;
+    }
 
     SDL_RenderPresent(renderer);
 
-    Uint64 end = SDL_GetTicks();
-
-    Uint64 time_elapsed = (end - start == 0) ? 1 : end-start;
-    Uint64 fps = 1000/time_elapsed;
-    std::cout << fps << '\n';
-
   }
 
-  SDL_DestroyTexture(mFontTextTexture);
+  running.store(false, std::memory_order_release);
+  worker_thread.join();
+
+  for (int i = 0 ; i < 10 ; i++ ) {
+    SDL_DestroyTexture(glyph_texture[i]);
+  }
+  TTF_CloseFont(font);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
+  TTF_Quit();
   SDL_Quit();
 
   return EXIT_SUCCESS;
@@ -188,7 +222,7 @@ int main(int argc, char *argv[]) {
 
   SDL_Window *window = SDL_CreateWindow("SDL3 + SDL3_image + FFmpeg Test", 800,
                                         600, SDL_WINDOW_RESIZABLE);
-  SDL_Renderer *renderer = SDL_CreateRenderer(window, nullptr);
+  SDL_Renderer *renderer = SDL_CreateRenderer(window, SDL_RENDERER_ACCELERATED );
 
   // ---------------- Test SDL3_image ----------------
   SDL_Surface *surface = IMG_Load("../resources/sample.png"); // adjust path
