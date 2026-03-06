@@ -9,7 +9,7 @@ SDL_AppResult sdl::init(std::string name, std::string version,
 
   if (!SDL_Init(flag)) {
     std::cerr << "error occured while initialising SDL" << SDL_GetError()
-              << std::endl;
+              << '\n';
     return SDL_APP_FAILURE;
   }
 
@@ -30,7 +30,7 @@ SDL_AppResult sdl::initWindow(std::string title, int height, int width) {
   gWindow =
       SDL_CreateWindow(title.c_str(), width, height, SDL_WINDOW_RESIZABLE);
   if (!gWindow) {
-    std::cerr << "error creating window" << SDL_GetError() << std::endl;
+    std::cerr << "error creating window" << SDL_GetError() << '\n';
     return SDL_APP_FAILURE;
   } else {
     std::cout << "window created successfully\n";
@@ -44,7 +44,7 @@ SDL_AppResult sdl::initWindow(std::string title, int height, int width) {
 SDL_AppResult sdl::initRenderer() {
   gRenderer = SDL_CreateRenderer(gWindow, NULL);
   if (!gRenderer) {
-    std::cerr << "error creating renderer" << SDL_GetError() << std::endl;
+    std::cerr << "error creating renderer" << SDL_GetError() << '\n';
     return SDL_APP_FAILURE;
   } else {
     std::cout << "renderer initialied successfully\n";

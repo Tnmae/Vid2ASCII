@@ -29,7 +29,7 @@
         sdl3-image
         sdl3-ttf
 
-        valgrind 
+        valgrind
         kdePackages.kcachegrind 
         perf
       ];

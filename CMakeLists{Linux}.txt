@@ -25,4 +25,3 @@ target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3 SDL3_image::SDL3_image 
                                               ${FFMPEG_LIBRARIES} dl)
 
 target_compile_options(${PROJECT_NAME} PRIVATE -static -g)
-target_compile_flags(${PROJECT_NAME} PRIVATE -pg)

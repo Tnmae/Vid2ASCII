@@ -88,12 +88,183 @@ void worker_function() {
     new_frame_ready.store(true, std::memory_order_release);
 
     while (new_frame_ready.load(std::memory_order_acquire) && running) {
-      std::this_thread::yield();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   }
 }
 
+void pixelate_frame() {
 
+}
+
+void decode_video() {
+  // opening video file
+   
+
+  // processing on raw pixel data
+  pixelate_frame();
+
+  // coneverting the frame into ascii 
+  //generate_frame();
+}
+
+
+bool decode_per_frame(const char* videoPath, uint8_t** outBuffer, int* width, int* height) {
+
+  AVFormatContext* avformat_ctx = avformat_alloc_context();
+
+  if (!avformat_ctx) {
+    std::cerr << "error allocating context for AVFormat\n";
+    return false;
+  }else {
+    std::cout << "format context created successfully\n";
+  }
+
+  if (avformat_open_input(&avformat_ctx, videoPath, NULL, NULL) != 0) {
+    std::cerr << "error opening video file\n";
+    return false;
+  }else {
+    std::cout << "video frame loaded successfully\n";
+  }
+
+  if (avformat_find_stream_info(avformat_ctx, NULL) < 0) {
+    std::cerr << "could not find stream info\n";
+    return false;
+  }else {
+    std::cout << "stream info found\n";
+  }
+
+  int video_stream_idx = -1;
+
+  AVCodecParameters* av_codec_params;
+  const AVCodec* avcodec;
+    
+  for (int i = 0 ; i < avformat_ctx->nb_streams ; i++ ) {
+    auto stream = avformat_ctx->streams[i];
+
+    av_codec_params = stream->codecpar;
+    avcodec = avcodec_find_decoder(av_codec_params->codec_id);
+
+    if (av_codec_params->codec_type == AVMEDIA_TYPE_VIDEO) {
+      video_stream_idx = i;
+      break;
+    }
+  }
+
+  if (video_stream_idx == -1 ) {
+    std::cerr << "could not find a video stream\n";
+    return false;
+  }else {
+    std::cout << "video stream index is at: " << video_stream_idx << '\n';
+  }
+
+  AVCodecContext *avcodec_ctx = avcodec_alloc_context3(avcodec);
+
+  if (!avcodec_ctx) {
+    std::cerr << "could not allocate context for codec\n";
+    return false;
+  }else {
+    std::cout << "context for codec allocated\n";
+  }
+
+  if (avcodec_parameters_to_context(avcodec_ctx, av_codec_params) < 0) {
+    std::cerr << "could not initialize AVCodec context\n";
+    return false;
+  }else {
+    std::cout << "Initialized AVCodec context\n";
+  }
+
+  if (avcodec_open2(avcodec_ctx, avcodec, NULL)) {
+    std::cerr << "Could not open context\n";
+    return false;
+  }else {
+    std::cout << "Opened context successfully\n";
+  }
+
+  AVFrame* avFrame = av_frame_alloc();
+  if (!avFrame) {
+    std::cerr << "could not allocate frame\n";
+    return false;
+  }else {
+    std::cout << "allocated frame\n";
+  }
+
+  AVPacket* avPacket = av_packet_alloc();
+  if (!avPacket) {
+    std::cerr << "could not allocate packet\n";
+    return false;
+  }else {
+    std::cout << "allocated packet\n";
+  }
+  
+  int response;
+  while (av_read_frame(avformat_ctx, avPacket) >= 0) {
+    if (avPacket->stream_index != video_stream_idx) {
+      av_packet_unref(avPacket);
+      continue;
+    }else {
+      response = avcodec_send_packet(avcodec_ctx, avPacket);
+      if (response < 0) {
+        std::cerr << "failed to decode packet: " << av_err2str(response) << '\n';
+        return false;
+      }else {
+        std::cout << "packet decoded successfully\n";
+      }
+
+      response = avcodec_receive_frame(avcodec_ctx, avFrame);
+      if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
+        continue;
+      }else if (response < 0 ) {
+        std::cerr << "failed to decode packet : " << av_err2str(response) << '\n';
+        return false;
+      }
+
+      av_packet_unref(avPacket);
+      break;
+    }
+
+  }
+
+
+  SwsContext* sws_scaler_ctx = sws_getContext(avFrame->width, avFrame->height, avcodec_ctx->pix_fmt,
+      800, 600, AV_PIX_FMT_RGB0, SWS_FAST_BILINEAR,
+      NULL, NULL, NULL);
+
+  if (!sws_scaler_ctx) {
+    std::cerr << "error creating scaler context\n";
+    return false;
+  }else {
+    std::cout << "scaler context created\n";
+  }
+
+  uint8_t* data = new uint8_t[WIDTH * HEIGHT * 4];
+  uint8_t* dest[4] = {data, NULL, NULL, NULL};
+  int dest_linesize[4] = {WIDTH * 4, 0, 0, 0};
+
+  sws_scale(sws_scaler_ctx, avFrame->data, avFrame->linesize, 0, avFrame->height, dest, dest_linesize);
+
+  sws_free_context(&sws_scaler_ctx);
+  *width = WIDTH;
+  *height = HEIGHT;
+  *outBuffer = data;
+
+  avformat_close_input(&avformat_ctx);
+  avformat_free_context(avformat_ctx);
+  av_frame_free(&avFrame);
+  av_packet_free(&avPacket);
+  avcodec_free_context(&avcodec_ctx);
+
+  return true;
+}
+
+void display_frame(uint8_t* outBuffer, int width, int height) {
+  for (int y = 0 ; y < height ; y++) {
+    for (int x = 0 ; x < width ; x++ ) {
+      SDL_SetRenderDrawColor(renderer, (int)outBuffer[y * width * 4 + x * 4], (int)outBuffer[y * width * 4 + x * 4 + 1 ] , (int)outBuffer[y * width * 4 + x * 4 + 2], (int)outBuffer[y * width * 4 + x * 4 + 3]);
+      SDL_RenderPoint(renderer, x, y);
+    }
+  }
+}
 
 int main(int argc, char *argv[]) {
 
@@ -151,11 +322,19 @@ int main(int argc, char *argv[]) {
   auto start = std::chrono::high_resolution_clock::now();
   int frame_count = 0;
 
-  std::thread worker_thread(worker_function);
+  //std::thread worker_thread(worker_function);
+
+  uint8_t* outBuffer;
+  int width, height;
+  std::string videoPath("../resources/sample.mp4");
+
+  decode_per_frame(videoPath.c_str(), &outBuffer, &width, &height);
 
   while (running1) {
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_EVENT_QUIT) {
+        //running.store(false, std::memory_order_release);
+        //worker_thread.join();
         running1 = false;
       }
     }
@@ -163,12 +342,12 @@ int main(int argc, char *argv[]) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
     SDL_RenderClear(renderer);
 
-    if (new_frame_ready.load(std::memory_order_acquire)) {
-      memcpy(frame, back_buffer, sizeof(frame));
-      new_frame_ready.store(false);
-    }
+    //if (new_frame_ready.load(std::memory_order_acquire)) {
+    //  memcpy(frame, back_buffer, sizeof(frame));
+    //  new_frame_ready.store(false);
+    //}
 
-    RenderFrame(glyph_texture, font);
+    display_frame(outBuffer, width, height);
 
     auto end = std::chrono::high_resolution_clock::now();
     frame_count++;
@@ -183,9 +362,8 @@ int main(int argc, char *argv[]) {
 
   }
 
-  running.store(false, std::memory_order_release);
-  worker_thread.join();
 
+  delete[] outBuffer;
   for (int i = 0 ; i < 10 ; i++ ) {
     SDL_DestroyTexture(glyph_texture[i]);
   }
@@ -222,7 +400,7 @@ int main(int argc, char *argv[]) {
 
   SDL_Window *window = SDL_CreateWindow("SDL3 + SDL3_image + FFmpeg Test", 800,
                                         600, SDL_WINDOW_RESIZABLE);
-  SDL_Renderer *renderer = SDL_CreateRenderer(window, SDL_RENDERER_ACCELERATED );
+  SDL_Renderer *renderer = SDL_CreateRenderer(window, nullptr );
 
   // ---------------- Test SDL3_image ----------------
   SDL_Surface *surface = IMG_Load("../resources/sample.png"); // adjust path
