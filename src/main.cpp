@@ -11,7 +11,17 @@
 #define WIDTH 900
 #define HEIGHT 600
 
-#define GLYPH_SIZE 15
+#define GLYPH_SIZE 10
+
+struct VideoReaderState {
+  AVFormatContext *avformat_ctx;
+  AVCodecContext* avcodec_ctx;
+  int video_stream_idx;
+  int width, height;
+  AVFrame* av_frame;
+  AVPacket* av_packet;
+  SwsContext* sws_scaler_ctx;
+};
 
 static SDL_Renderer *renderer = nullptr;
 
@@ -108,45 +118,54 @@ void decode_video() {
   //generate_frame();
 }
 
+bool video_reader_open(VideoReaderState* state, const char* videoPath) {
+  auto& width = state->width;
+  auto& height = state->height;
+  auto& video_stream_idx = state->video_stream_idx;
+  auto& localfmtCtx = state->avformat_ctx;
+  auto& localCodecCtx = state->avcodec_ctx;
+  auto& localScalerCtx = state->sws_scaler_ctx;
+  auto& frame = state->av_frame;
+  auto& packet = state->av_packet;
 
-bool decode_per_frame(const char* videoPath, uint8_t** outBuffer, int* width, int* height) {
+  localfmtCtx = avformat_alloc_context();
 
-  AVFormatContext* avformat_ctx = avformat_alloc_context();
-
-  if (!avformat_ctx) {
+  if (!localfmtCtx) {
     std::cerr << "error allocating context for AVFormat\n";
     return false;
   }else {
     std::cout << "format context created successfully\n";
   }
 
-  if (avformat_open_input(&avformat_ctx, videoPath, NULL, NULL) != 0) {
+  if (avformat_open_input(&localfmtCtx, videoPath, NULL, NULL) != 0) {
     std::cerr << "error opening video file\n";
     return false;
   }else {
     std::cout << "video frame loaded successfully\n";
   }
 
-  if (avformat_find_stream_info(avformat_ctx, NULL) < 0) {
+  if (avformat_find_stream_info(localfmtCtx, NULL) < 0) {
     std::cerr << "could not find stream info\n";
     return false;
   }else {
     std::cout << "stream info found\n";
   }
 
-  int video_stream_idx = -1;
+  video_stream_idx = -1;
 
   AVCodecParameters* av_codec_params;
   const AVCodec* avcodec;
     
-  for (int i = 0 ; i < avformat_ctx->nb_streams ; i++ ) {
-    auto stream = avformat_ctx->streams[i];
+  for (int i = 0 ; i < localfmtCtx->nb_streams ; i++ ) {
+    AVStream* av_stream = localfmtCtx->streams[i];
 
-    av_codec_params = stream->codecpar;
+    av_codec_params = av_stream->codecpar;
     avcodec = avcodec_find_decoder(av_codec_params->codec_id);
 
     if (av_codec_params->codec_type == AVMEDIA_TYPE_VIDEO) {
       video_stream_idx = i;
+      width = av_codec_params->width;
+      height = av_codec_params->height;
       break;
     }
   }
@@ -158,60 +177,71 @@ bool decode_per_frame(const char* videoPath, uint8_t** outBuffer, int* width, in
     std::cout << "video stream index is at: " << video_stream_idx << '\n';
   }
 
-  AVCodecContext *avcodec_ctx = avcodec_alloc_context3(avcodec);
+  localCodecCtx = avcodec_alloc_context3(avcodec);
 
-  if (!avcodec_ctx) {
+  if (!localCodecCtx) {
     std::cerr << "could not allocate context for codec\n";
     return false;
   }else {
     std::cout << "context for codec allocated\n";
   }
 
-  if (avcodec_parameters_to_context(avcodec_ctx, av_codec_params) < 0) {
+  if (avcodec_parameters_to_context(localCodecCtx, av_codec_params) < 0) {
     std::cerr << "could not initialize AVCodec context\n";
     return false;
   }else {
     std::cout << "Initialized AVCodec context\n";
   }
 
-  if (avcodec_open2(avcodec_ctx, avcodec, NULL)) {
+  if (avcodec_open2(localCodecCtx, avcodec, NULL)) {
     std::cerr << "Could not open context\n";
     return false;
   }else {
     std::cout << "Opened context successfully\n";
   }
 
-  AVFrame* avFrame = av_frame_alloc();
-  if (!avFrame) {
+  frame = av_frame_alloc();
+  if (!frame) {
     std::cerr << "could not allocate frame\n";
     return false;
   }else {
     std::cout << "allocated frame\n";
   }
 
-  AVPacket* avPacket = av_packet_alloc();
-  if (!avPacket) {
+  packet = av_packet_alloc();
+  if (!packet) {
     std::cerr << "could not allocate packet\n";
     return false;
   }else {
     std::cout << "allocated packet\n";
   }
   
+  return true;
+}
+
+bool decode_per_frame(VideoReaderState* state, uint8_t* frameBuffer) {
+  auto& width = state->width;
+  auto& height = state->height;
+  auto& video_stream_idx = state->video_stream_idx;
+  auto& localfmtCtx = state->avformat_ctx;
+  auto& localCodecCtx = state->avcodec_ctx;
+  auto& localScalerCtx = state->sws_scaler_ctx;
+  auto& frame = state->av_frame;
+  auto& packet = state->av_packet;
+
   int response;
-  while (av_read_frame(avformat_ctx, avPacket) >= 0) {
-    if (avPacket->stream_index != video_stream_idx) {
-      av_packet_unref(avPacket);
+  while (av_read_frame(localfmtCtx, packet) >= 0) {
+    if (packet->stream_index != video_stream_idx) {
+      av_packet_unref(packet);
       continue;
     }else {
-      response = avcodec_send_packet(avcodec_ctx, avPacket);
+      response = avcodec_send_packet(localCodecCtx, packet);
       if (response < 0) {
         std::cerr << "failed to decode packet: " << av_err2str(response) << '\n';
         return false;
-      }else {
-        std::cout << "packet decoded successfully\n";
       }
 
-      response = avcodec_receive_frame(avcodec_ctx, avFrame);
+      response = avcodec_receive_frame(localCodecCtx, frame);
       if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
         continue;
       }else if (response < 0 ) {
@@ -219,49 +249,65 @@ bool decode_per_frame(const char* videoPath, uint8_t** outBuffer, int* width, in
         return false;
       }
 
-      av_packet_unref(avPacket);
+      localScalerCtx = sws_getContext(width, height, localCodecCtx->pix_fmt, WIDTH, HEIGHT, AV_PIX_FMT_RGB0, SWS_FAST_BILINEAR, NULL, NULL, NULL);
+
+      if (!localScalerCtx) {
+        std::cerr << "error creating scaler context\n";
+        return false;
+      }
+
+      av_packet_unref(packet);
       break;
     }
-
   }
 
-
-  SwsContext* sws_scaler_ctx = sws_getContext(avFrame->width, avFrame->height, avcodec_ctx->pix_fmt,
-      800, 600, AV_PIX_FMT_RGB0, SWS_FAST_BILINEAR,
-      NULL, NULL, NULL);
-
-  if (!sws_scaler_ctx) {
-    std::cerr << "error creating scaler context\n";
-    return false;
-  }else {
-    std::cout << "scaler context created\n";
-  }
-
-  uint8_t* data = new uint8_t[WIDTH * HEIGHT * 4];
-  uint8_t* dest[4] = {data, NULL, NULL, NULL};
+  uint8_t* dest[4] = {frameBuffer, NULL, NULL, NULL};
   int dest_linesize[4] = {WIDTH * 4, 0, 0, 0};
 
-  sws_scale(sws_scaler_ctx, avFrame->data, avFrame->linesize, 0, avFrame->height, dest, dest_linesize);
-
-  sws_free_context(&sws_scaler_ctx);
-  *width = WIDTH;
-  *height = HEIGHT;
-  *outBuffer = data;
-
-  avformat_close_input(&avformat_ctx);
-  avformat_free_context(avformat_ctx);
-  av_frame_free(&avFrame);
-  av_packet_free(&avPacket);
-  avcodec_free_context(&avcodec_ctx);
+  sws_scale(localScalerCtx, frame->data, frame->linesize, 0, frame->height, dest, dest_linesize);
 
   return true;
 }
 
-void display_frame(uint8_t* outBuffer, int width, int height) {
-  for (int y = 0 ; y < height ; y++) {
-    for (int x = 0 ; x < width ; x++ ) {
-      SDL_SetRenderDrawColor(renderer, (int)outBuffer[y * width * 4 + x * 4], (int)outBuffer[y * width * 4 + x * 4 + 1 ] , (int)outBuffer[y * width * 4 + x * 4 + 2], (int)outBuffer[y * width * 4 + x * 4 + 3]);
-      SDL_RenderPoint(renderer, x, y);
+void video_reader_close(VideoReaderState* state) {
+  sws_free_context(&state->sws_scaler_ctx);
+  avformat_close_input(&state->avformat_ctx);
+  avformat_free_context(state->avformat_ctx);
+  av_frame_free(&state->av_frame);
+  av_packet_free(&state->av_packet);
+  avcodec_free_context(&state->avcodec_ctx);
+
+}
+
+void pixelate_frame(uint8_t* frameBuffer) {
+  for (int y = 0 ; y < HEIGHT; y = y + GLYPH_SIZE) {
+    for (int x = 0 ; x < WIDTH ; x = x + GLYPH_SIZE ) {
+      double avg = 0;
+      for (int i = 0 ; i < GLYPH_SIZE ; i++ ) {
+        for (int j = 0 ; j < GLYPH_SIZE ; j++ ) {
+          uint8_t red = frameBuffer[( (y + i) * WIDTH + (x + j) ) * 4 ];
+          uint8_t green = frameBuffer[( (y + i) * WIDTH + (x + j) )  * 4 + 1 ];
+          uint8_t blue = frameBuffer[( (y + i) * WIDTH + (x + j) ) * 4 + 2 ];
+          avg += (red + blue + green)/3;
+        }
+      }
+      avg = avg / (GLYPH_SIZE * GLYPH_SIZE);
+      for (int i = 0 ; i < GLYPH_SIZE ; i++ ) {
+        for (int j = 0 ; j < GLYPH_SIZE ; j++ ) {
+          frameBuffer[( (y + i) * WIDTH + (x + j) ) * 4 ] = avg;
+          frameBuffer[( (y + i) * WIDTH + (x + j) ) * 4 + 1 ] = avg;
+          frameBuffer[( (y + i) * WIDTH + (x + j) ) * 4  + 2 ] = avg;
+        }
+      }
+    }
+  }
+}
+
+void video_display_frame(VideoReaderState* state, uint8_t* frameBuffer, std::vector<SDL_Texture* > glyph_texture) {
+  pixelate_frame(frameBuffer);
+  for (int y = 0 ; y < HEIGHT ; y = y + GLYPH_SIZE ) {
+    for (int x = 0 ; x < WIDTH ; x = x + GLYPH_SIZE ) {
+      RenderText(glyph_texture[9 - ((float)frameBuffer[ y * WIDTH * 4 + x * 4] / 255.0f) * 9], (float)x , (float)y, GLYPH_SIZE, GLYPH_SIZE);
     }
   }
 }
@@ -324,11 +370,19 @@ int main(int argc, char *argv[]) {
 
   //std::thread worker_thread(worker_function);
 
-  uint8_t* outBuffer;
+  uint8_t* frameBuffer = new uint8_t[WIDTH * HEIGHT * 4];
   int width, height;
-  std::string videoPath("../resources/sample.mp4");
+  std::string videoPath("../resources/thanos.mp4");
+  VideoReaderState state;
 
-  decode_per_frame(videoPath.c_str(), &outBuffer, &width, &height);
+  if (!video_reader_open(&state, videoPath.c_str())) {
+    std::cerr << "error opening video\n";
+    return EXIT_FAILURE;
+  }
+
+  if (!decode_per_frame(&state, frameBuffer)) {
+    std::cerr << "error decoding frame\n";
+  }
 
   while (running1) {
     while (SDL_PollEvent(&event)) {
@@ -347,8 +401,13 @@ int main(int argc, char *argv[]) {
     //  new_frame_ready.store(false);
     //}
 
-    display_frame(outBuffer, width, height);
+    if (!decode_per_frame(&state, frameBuffer)) {
+      std::cerr << "error decoding frame\n";
+      return EXIT_FAILURE;
+    }
 
+    video_display_frame(&state, frameBuffer, glyph_texture);
+  
     auto end = std::chrono::high_resolution_clock::now();
     frame_count++;
     double time_elapsed = std::chrono::duration<double>(end-start).count();
@@ -363,7 +422,9 @@ int main(int argc, char *argv[]) {
   }
 
 
-  delete[] outBuffer;
+  video_reader_close(&state);
+
+  delete[] frameBuffer;
   for (int i = 0 ; i < 10 ; i++ ) {
     SDL_DestroyTexture(glyph_texture[i]);
   }
