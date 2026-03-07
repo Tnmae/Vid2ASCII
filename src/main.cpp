@@ -12,6 +12,9 @@
 #define HEIGHT 600
 
 #define GLYPH_SIZE 10
+#define FPS 30
+
+const double target_frame_time = 1000.0f/FPS;
 
 struct VideoReaderState {
   AVFormatContext *avformat_ctx;
@@ -33,7 +36,7 @@ constexpr int num_iter = rows * columns;
 static uint8_t frame[ num_iter ];
 static uint8_t back_buffer[ num_iter ];
 
-constexpr char luminosity[] = "@%#*+=-:. ";
+constexpr char luminosity[] = " .:-=+*#%@";
 
 std::atomic_bool new_frame_ready = false;
 std::atomic_bool running = true;
@@ -103,20 +106,6 @@ void worker_function() {
   }
 }
 
-void pixelate_frame() {
-
-}
-
-void decode_video() {
-  // opening video file
-   
-
-  // processing on raw pixel data
-  pixelate_frame();
-
-  // coneverting the frame into ascii 
-  //generate_frame();
-}
 
 bool video_reader_open(VideoReaderState* state, const char* videoPath) {
   auto& width = state->width;
@@ -303,13 +292,47 @@ void pixelate_frame(uint8_t* frameBuffer) {
   }
 }
 
-void video_display_frame(VideoReaderState* state, uint8_t* frameBuffer, std::vector<SDL_Texture* > glyph_texture) {
-  pixelate_frame(frameBuffer);
-  for (int y = 0 ; y < HEIGHT ; y = y + GLYPH_SIZE ) {
-    for (int x = 0 ; x < WIDTH ; x = x + GLYPH_SIZE ) {
-      RenderText(glyph_texture[9 - ((float)frameBuffer[ y * WIDTH * 4 + x * 4] / 255.0f) * 9], (float)x , (float)y, GLYPH_SIZE, GLYPH_SIZE);
-    }
+
+void createBlank(SDL_Texture*& streamingTexture) {
+  streamingTexture = SDL_CreateTexture(
+    renderer,
+    SDL_PIXELFORMAT_RGBA32,
+    SDL_TEXTUREACCESS_STREAMING,
+    WIDTH,
+    HEIGHT);
+  if (streamingTexture == NULL) {
+    SDL_Log("Unable to create texture: %s", SDL_GetError());
+    SDL_ClearError();
   }
+}
+
+void lockTexture(SDL_Texture*& streamingTexture, void** texturePixels, int *texturePitch) {
+  if (SDL_LockTexture(streamingTexture, NULL, texturePixels, texturePitch) != 0 ) {
+    //std::cerr << "Unable to lock texture: " << SDL_GetError();
+    SDL_ClearError();
+  }
+}
+
+void copyPixels(uint8_t* frameBuffer, void** texturePixels, int* texturePitch) {
+  if (frameBuffer != NULL ) {
+    memcpy(*texturePixels, frameBuffer, (*texturePitch) * HEIGHT);
+  }
+}
+
+void unlockTexture(SDL_Texture*& streamingTexture, void** texturePixels, int* texturePitch) {
+  SDL_UnlockTexture(streamingTexture);
+}
+
+void video_display_frame(VideoReaderState* state, uint8_t* frameBuffer, std::vector<SDL_Texture* > glyph_texture, SDL_Texture*& streamingTexture, void** texturePixels, int* texturePitch) {
+  pixelate_frame(frameBuffer);
+  ///for (int y = 0 ; y < HEIGHT ; y = y + GLYPH_SIZE ) {
+  ///  for (int x = 0 ; x < WIDTH ; x = x + GLYPH_SIZE ) {
+  ///    RenderText(glyph_texture[((float)frameBuffer[ y * WIDTH * 4 + x * 4] / 255.0f) * 9], (float)x , (float)y, GLYPH_SIZE, GLYPH_SIZE);
+  ///  }
+  ///}
+  lockTexture(streamingTexture, texturePixels, texturePitch);
+  copyPixels(frameBuffer, texturePixels, texturePitch);
+  unlockTexture(streamingTexture, texturePixels, texturePitch);
 }
 
 int main(int argc, char *argv[]) {
@@ -371,6 +394,12 @@ int main(int argc, char *argv[]) {
   //std::thread worker_thread(worker_function);
 
   uint8_t* frameBuffer = new uint8_t[WIDTH * HEIGHT * 4];
+  void* texturePixels = NULL;
+  int texturePitch = 0;
+  SDL_Texture* streamingTexture;
+
+  createBlank(streamingTexture);
+
   int width, height;
   std::string videoPath("../resources/thanos.mp4");
   VideoReaderState state;
@@ -383,6 +412,8 @@ int main(int argc, char *argv[]) {
   if (!decode_per_frame(&state, frameBuffer)) {
     std::cerr << "error decoding frame\n";
   }
+
+
 
   while (running1) {
     while (SDL_PollEvent(&event)) {
@@ -401,22 +432,29 @@ int main(int argc, char *argv[]) {
     //  new_frame_ready.store(false);
     //}
 
+    auto frame_start = std::chrono::high_resolution_clock::now();
     if (!decode_per_frame(&state, frameBuffer)) {
       std::cerr << "error decoding frame\n";
       return EXIT_FAILURE;
     }
 
-    video_display_frame(&state, frameBuffer, glyph_texture);
-  
-    auto end = std::chrono::high_resolution_clock::now();
+    video_display_frame(&state, frameBuffer, glyph_texture, streamingTexture, &texturePixels, &texturePitch);
+    auto frame_end = std::chrono::high_resolution_clock::now();
+    double frame_time = std::chrono::duration<double, std::milli>(frame_end - frame_start).count();
+
+    if (frame_time < target_frame_time) {
+      SDL_Delay(target_frame_time - frame_time);
+    }
+
     frame_count++;
+    auto end = frame_end;
     double time_elapsed = std::chrono::duration<double>(end-start).count();
     if (time_elapsed > 1.0) {
       std::cout << "fps: " << frame_count/time_elapsed << '\n';
       frame_count = 0;
       start = end;
     }
-
+    SDL_RenderTexture(renderer, streamingTexture, NULL, NULL);
     SDL_RenderPresent(renderer);
 
   }
@@ -425,10 +463,13 @@ int main(int argc, char *argv[]) {
   video_reader_close(&state);
 
   delete[] frameBuffer;
+
   for (int i = 0 ; i < 10 ; i++ ) {
     SDL_DestroyTexture(glyph_texture[i]);
   }
+
   TTF_CloseFont(font);
+  SDL_DestroyTexture(streamingTexture);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
   TTF_Quit();
