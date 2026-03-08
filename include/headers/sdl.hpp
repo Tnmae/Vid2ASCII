@@ -1,31 +1,37 @@
 #ifndef SDL_H
 #define SDL_H
 
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_time.h>
-#include <SDL3_image/SDL_image.h>
-#include <SDL3_ttf/SDL_ttf.h>
-#include <iostream>
-#include <string>
+#include "FontTexture.hpp"
 
-static SDL_Window *gWindow = nullptr;
-static SDL_Renderer *gRenderer = nullptr;
-
-class sdl {
+class SDL_App {
 public:
-  SDL_AppResult init(std::string name, std::string version,
-                     std::string identifier, Uint32 flag, std::string title,
-                     Uint32 height, Uint32 width);
-  SDL_AppResult initWindow(std::string title, int height, int width);
+  SDL_App(std::string title, int width, int height, SDL_WindowFlags flag);
+  ~SDL_App();
+  SDL_AppResult initWindow(std::string title, int width, int height, SDL_WindowFlags flag);
   SDL_AppResult initRenderer();
-  void quit();
   Uint32 getWindowHeight();
   Uint32 getWindowWidth();
-  void appLoop();
+  SDL_Window* getWindow();
+  SDL_Renderer* getRenderer();
+  bool getStatus();
+  void setTargetFrameTime();
+  void update(std::chrono::time_point<std::chrono::high_resolution_clock> frame_start, SDL_Texture* texture);
+  void inputHandler();
+  void fpsLimiter(std::chrono::time_point<std::chrono::high_resolution_clock> frame_start);
+  void fpsCounter();
+  void appStartTimer();
 
 private:
+  SDL_Window *gWindow = NULL;
+  SDL_Renderer *gRenderer = NULL;
   Uint32 width;
   Uint32 height;
+  bool running = true;
+  std::chrono::time_point<std::chrono::high_resolution_clock> start;
+  int FPS = 30;
+  int frame_count = 0;
+  double target_frame_time;
+  SDL_FRect frameRect;
 };
 
 #endif /*SDL_H*/
