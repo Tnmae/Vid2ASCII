@@ -14,8 +14,8 @@ public:
   SDL_Window* getWindow();
   SDL_Renderer* getRenderer();
   bool getStatus();
-  void setTargetFrameTime();
-  void update(std::chrono::time_point<std::chrono::high_resolution_clock> frame_start, SDL_Texture* texture);
+  void setFPS(int FPS);
+  void update( std::chrono::time_point<std::chrono::high_resolution_clock> frame_start, SDL_Texture* texture);
   void inputHandler();
   void fpsLimiter(std::chrono::time_point<std::chrono::high_resolution_clock> frame_start);
   void fpsCounter();
@@ -28,9 +28,10 @@ private:
   Uint32 height;
   bool running = true;
   std::chrono::time_point<std::chrono::high_resolution_clock> start;
-  int FPS = 30;
+  int FPS = 30.0f;
   int frame_count = 0;
   double target_frame_time;
+  void setTargetFrameTime();
   SDL_FRect frameRect;
 };
 

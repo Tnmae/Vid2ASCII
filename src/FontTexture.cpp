@@ -16,7 +16,7 @@ FontTexture::FontTexture(std::string ttfPath) {
 
 FontTexture::~FontTexture() {
   for (int i = 0 ; i < 10 ; i++ ) {
-    SDL_DestroyTexture(FontTexture::glyph_textures[i]);
+    SDL_DestroySurface(FontTexture::glyph_cache[i]);
   }
   if (FontTexture::mFont)
     TTF_CloseFont(FontTexture::mFont);
@@ -24,7 +24,7 @@ FontTexture::~FontTexture() {
 }
 
 bool FontTexture::loadFont(std::string ttfPath) {
-  FontTexture::mFont = TTF_OpenFont(ttfPath.c_str(), 60);
+  FontTexture::mFont = TTF_OpenFont(ttfPath.c_str(), PIXEL_SIZE);
 
   if (!FontTexture::mFont) {
     std::cerr << "Error loading ttf file : " << SDL_GetError() << '\n';
@@ -35,27 +35,25 @@ bool FontTexture::loadFont(std::string ttfPath) {
   return true;
 }
 
-std::vector<SDL_Texture*> FontTexture::getGlyphCache() {
-  return FontTexture::glyph_textures;
+std::vector<SDL_Surface*> FontTexture::getGlyphCache() {
+  return FontTexture::glyph_cache;
 }
 
-void FontTexture::generate_glyph_texture(SDL_Renderer* gRenderer, SDL_Texture *& glyph_textures, char* glyph) {
-  SDL_Surface *textSurface = TTF_RenderText_Blended_Wrapped(FontTexture::mFont, glyph, 0, SDL_Color{255, 255, 255, 255}, 0);
-  glyph_textures = SDL_CreateTextureFromSurface(gRenderer, textSurface);
-  if (!glyph_textures) {
-    std::cerr << "unable to create glyph texture: " << SDL_GetError() << '\n';
+bool FontTexture::generate_glyph_surface(SDL_Renderer* gRenderer, SDL_Surface *& glyph_surface, char glyph) {
+  glyph_surface = TTF_RenderGlyph_Blended(FontTexture::mFont, glyph, SDL_Color{255, 255, 255, 255});
+  if (!glyph_surface) {
+    std::cerr << "error creating surface" << SDL_GetError() << '\n';
     SDL_ClearError();
+    return false;
   }
-  SDL_DestroySurface(textSurface);
+  return true;
 }
 
 void FontTexture::build_glyph_cache(SDL_Renderer* gRenderer) {
   for (int i = 0 ; i < 10 ; i++ ) {
-    char glyph[2] = { luminosity[i] , '\0'};
-    generate_glyph_texture(gRenderer, FontTexture::glyph_textures[i], glyph);
+    char glyph = luminosity[i];
+    if (!generate_glyph_surface(gRenderer, FontTexture::glyph_cache[i], glyph)) {
+      return;
+    }
   }
-}
-
-Uint32 FontTexture::getGlyphSize() {
-  return FontTexture::glyph_size;
 }

@@ -53,14 +53,14 @@ SDL_AppResult SDL_App::initRenderer() {
 
   if (!gRenderer) {
     std::cerr << "Error creating renderer : " << SDL_GetError() << '\n';
-    SDL_APP_FAILURE;
+    return SDL_APP_FAILURE;
   }else {
     std::cout << "Renderer created successfully\n";
   }
   return SDL_APP_CONTINUE;
 }
 
-void SDL_App::update(std::chrono::time_point<std::chrono::high_resolution_clock> frame_start, SDL_Texture* texture) {
+void SDL_App::update( std::chrono::time_point<std::chrono::high_resolution_clock> frame_start, SDL_Texture* texture) {
   SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 0);
   SDL_RenderClear(gRenderer);
   SDL_RenderTexture(gRenderer, texture, NULL, &(SDL_App::frameRect));
@@ -80,6 +80,11 @@ void SDL_App::inputHandler() {
 
 void SDL_App::appStartTimer() {
   SDL_App::start = std::chrono::high_resolution_clock::now();
+}
+
+void SDL_App::setFPS(int FPS) {
+  SDL_App::FPS = FPS;
+  SDL_App::setTargetFrameTime();
 }
 
 void SDL_App::setTargetFrameTime() {
@@ -102,8 +107,8 @@ void SDL_App::fpsCounter() {
   double time_elapsed = std::chrono::duration<double>(end-SDL_App::start).count();
   if (time_elapsed > 1.0) {
     std::cout << "fps: " << frame_count/time_elapsed << '\n';
-    frame_count = 0;
-    start = end;
+    SDL_App::frame_count = 0;
+    SDL_App::start = end;
   }
 
 }

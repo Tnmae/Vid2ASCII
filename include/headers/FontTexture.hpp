@@ -7,7 +7,11 @@
 #include <string>
 #include <chrono>
 
+#define PIXEL_SIZE 10
+
 static char luminosity[] = " .:-=+*#%@";
+
+
 
 class FontTexture {
   public:
@@ -16,15 +20,13 @@ class FontTexture {
     ~FontTexture();
     bool loadFont(std::string ttfPath);
     void build_glyph_cache(SDL_Renderer* gRenderer);
-    Uint32 getGlyphSize();
-    std::vector<SDL_Texture*> getGlyphCache();
+    std::vector<SDL_Surface*> getGlyphCache();
 
   private:
 
     TTF_Font* mFont = nullptr;
-    Uint32 glyph_size;
-    std::vector<SDL_Texture*> glyph_textures{ std::vector<SDL_Texture*>(10, nullptr)};
-    void generate_glyph_texture(SDL_Renderer* gRenderer, SDL_Texture*& glyph_texture, char* glyph);
+    std::vector<SDL_Surface*> glyph_cache{ std::vector<SDL_Surface*>(10, nullptr)};
+    bool generate_glyph_surface(SDL_Renderer* gRenderer, SDL_Surface*& glyph_texture, char glyph);
 };
 
 #endif /* FONT_TEXTURE_HPP */

@@ -11,7 +11,7 @@ find_package(SDL3 REQUIRED)
 find_package(SDL3_image REQUIRED)
 find_package(SDL3_ttf REQUIRED)
 
-pkg_check_modules(FFMPEG REQUIRED libavformat libavcodec libavutil libswscale)
+pkg_check_modules(FFMPEG REQUIRED libavformat libavcodec libavutil libswscale libavdevice)
 
 file(GLOB SRC_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
 

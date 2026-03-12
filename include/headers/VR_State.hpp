@@ -11,18 +11,19 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
 #include <libswscale/swscale.h>
+#include <libavdevice/avdevice.h>
 }
 
-#define PIXEL_SIZE 10
 
 class VideoReaderState {
 
 public:
   VideoReaderState(std::string videoPath, int scaler_width, int scaler_height);
   ~VideoReaderState();
-  bool video_reader_open(std::string videoPath, int scaler_width, int scaler_height);
+  bool video_reader_open(std::string videoPath);
   bool decode_per_frame(uint8_t* frameBuffer);
-  void video_display_frame(uint8_t* frameBuffer, std::vector<SDL_Texture* > glyph_textures, StreamingTexture* strmText);
+  double getVideoFPS();
+  void video_display_frame(SDL_Renderer* renderer, uint8_t* frameBuffer, std::vector<SDL_Surface* > glyph_surfaces, StreamingTexture* strmText);
 
 private:
   AVFormatContext *avformat_ctx;
@@ -34,6 +35,7 @@ private:
   AVPacket* av_packet;
   SwsContext* sws_scaler_ctx;
   void pixelate_frame(uint8_t* frameBuffer);
+  bool webcam = false;
 };
 
 #endif /*VIDEO_HPP*/

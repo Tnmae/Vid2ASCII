@@ -4,3 +4,4 @@ include/ffmpeg-8.0/
 postpush.sh
 prepush.sh
 CMakeLists.txt
+resources/

@@ -9,7 +9,7 @@ class StreamingTexture {
     StreamingTexture(SDL_Renderer* renderer, int width, int height);
     ~StreamingTexture();
     void lockTexture();
-    void copyPixels(uint8_t* frameBuffer, int height);
+    void copyPixels(uint8_t* frameBuffer, int height, int width, std::vector<SDL_Surface* > fontSurface);
     void unlockTexture();
     SDL_Texture* getDynTexture();
 
