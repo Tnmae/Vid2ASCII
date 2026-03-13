@@ -1,7 +1,7 @@
 .vscode
 build/
 include/ffmpeg-8.0/
+cmake/
 postpush.sh
 prepush.sh
-CMakeLists.txt
 resources/

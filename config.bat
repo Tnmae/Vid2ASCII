@@ -60,6 +60,4 @@ if not exist "%Folder%" (
     echo FFmpeg downloaded
 )
 
-ren "CMakeLists{WIN32}.txt" "CMakeLists.txt"
-
 cmake -G "MinGW Makefiles" -S . -B build

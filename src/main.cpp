@@ -1,7 +1,6 @@
 #include "sdl.hpp"
 #include "VR_State.hpp"
 #include "DynTexture.hpp"
-#include <chrono>
 
 #define WIDTH 900
 #define HEIGHT 600

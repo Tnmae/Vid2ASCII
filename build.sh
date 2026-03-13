@@ -19,9 +19,7 @@ else
 fi
 
 #build commands
-rm -rf CMakeLists{WIN32}.txt config.bat build.bat
-
-mv CMakeLists{Linux}.txt CMakeLists.txt
+rm -rf config.bat build.bat
 
 mkdir -p build
 

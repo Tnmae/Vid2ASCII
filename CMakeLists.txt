@@ -1,0 +1,94 @@
+cmake_minimum_required(VERSION 3.20)
+
+set(CMAKE_CXX_STANDARD 20)
+
+project(Vid2ASCII)
+add_executable(${CMAKE_PROJECT_NAME}) # WIN32 - hide the console like this add_executable(app WIN32)
+
+
+if(WIN32)
+    list(APPEND CMAKE_PREFIX_PATH
+        "${CMAKE_SOURCE_DIR}/include/SDL3/x86_64-w64-mingw32/lib/cmake/SDL3"
+        "${CMAKE_SOURCE_DIR}/include/SDL3_image/x86_64-w64-mingw32/lib/cmake/SDL3_image"
+        "${CMAKE_SOURCE_DIR}/include/SDL3_ttf/x86_64-w64-mingw32/lib/cmake/SDL3_ttf"
+    )
+
+    find_package(SDL3 CONFIG REQUIRED)
+    find_package(SDL3_image CONFIG REQUIRED)
+    find_package(SDL3_ttf CONFIG REQUIRED)
+
+    file(GLOB SRC_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
+
+    file(GLOB SDL3_DLLS
+        "${CMAKE_SOURCE_DIR}/include/SDL3/x86_64-w64-mingw32/bin/*.dll"
+    )
+
+    file(GLOB SDL3_IMAGE_DLLS
+        "${CMAKE_SOURCE_DIR}/include/SDL3_image/x86_64-w64-mingw32/bin/*.dll"
+    )
+
+    file(GLOB SDL3_TTF_DLLS
+        "${CMAKE_SOURCE_DIR}/include/SDL3_ttf/x86_64-w64-mingw32/bin/*.dll"
+    )
+
+    file(GLOB FFMPEG_DLLS
+        "${CMAKE_SOURCE_DIR}/include/ffmpeg-8.0/bin/*.dll"
+    )
+
+    add_custom_target(copy_dlls ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${SDL3_DLLS}
+        ${SDL3_IMAGE_DLLS}
+        ${SDL3_TTF_DLLS}
+        ${FFMPEG_DLLS}
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>
+    )
+
+
+    target_sources(${PROJECT_NAME} PRIVATE ${SRC_FILES})
+
+    target_include_directories(${PROJECT_NAME} PRIVATE 
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/headers
+        ${CMAKE_SOURCE_DIR}/include/ffmpeg-8.0/include
+    )
+
+    target_link_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include/ffmpeg-8.0/lib)
+
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+                            SDL3::SDL3
+                            SDL3_image::SDL3_image
+                            SDL3_ttf::SDL3_ttf
+                            avcodec
+                            avformat
+                            avutil
+                            avdevice
+                            swscale)
+
+    add_dependencies(${PROJECT_NAME} copy_dlls)
+
+    target_compile_definitions(${PROJECT_NAME} PRIVATE SDL_MAIN_USE_CALLBACKS)
+    target_compile_options(${PROJECT_NAME} PRIVATE -g)
+
+elseif(UNIX)
+
+    find_package(PkgConfig REQUIRED)
+    find_package(SDL3 REQUIRED)
+    find_package(SDL3_image REQUIRED)
+    find_package(SDL3_ttf REQUIRED)
+
+    pkg_check_modules(FFMPEG REQUIRED libavformat libavcodec libavutil libswscale libavdevice)
+
+    file(GLOB SRC_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
+
+    target_sources(${PROJECT_NAME} PRIVATE ${SRC_FILES})
+
+    target_include_directories(
+  ${PROJECT_NAME} PRIVATE ${FFMPEG_INCLUDE_DIRS}
+                          ${CMAKE_CURRENT_SOURCE_DIR}/include/headers)
+
+    target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3 SDL3_image::SDL3_image SDL3_ttf::SDL3_ttf
+                                              ${FFMPEG_LIBRARIES} dl)
+
+    target_compile_options(${PROJECT_NAME} PRIVATE -static -g)
+
+endif()
