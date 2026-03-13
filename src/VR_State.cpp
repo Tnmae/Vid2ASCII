@@ -41,8 +41,8 @@ bool VideoReaderState::video_reader_open(std::string videoPath) {
     std::cout << "format context created successfully\n";
   }
 
-  const AVInputFormat* av_input_fmt = nullptr;
-  AVDictionary* options = nullptr;
+  const AVInputFormat* av_input_fmt = NULL;
+  AVDictionary* options = NULL;
   if (webcam) {
     do {
       av_input_fmt = av_input_video_device_next(av_input_fmt);
@@ -54,11 +54,11 @@ bool VideoReaderState::video_reader_open(std::string videoPath) {
     }
 
     av_dict_set(&options, "framerate", "30", 0);
-    av_dict_set(&options, "video_size", "640x480", 0);
-    av_dict_set(&options, "pix_fmts", "0rgb", 0);
+    av_dict_set(&options, "video_size", "640x360", 0);
+    av_dict_set(&options, "pixel_format", "yuyv422", 0);
   }
 
-  if (avformat_open_input(&avformat_ctx, videoPath.c_str(), av_input_fmt, &options) != 0) {
+  if (avformat_open_input(&avformat_ctx, videoPath.c_str(), av_input_fmt, &options) < 0) {
     std::cerr << "error opening video file\n";
     return false;
   }else {

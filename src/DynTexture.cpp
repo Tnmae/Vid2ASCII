@@ -41,11 +41,15 @@ void StreamingTexture::copyPixels(uint8_t *frameBuffer, int height, int width, s
       int idx = (int)((float)(frameBuffer[i * width * 4  + j * 4] / 255.0f) * 9.0f);
       uint8_t* src = (uint8_t*)fontSurface[idx]->pixels;
       uint8_t* dst = (uint8_t*)texturePixels;
+      int fontWidth = fontSurface[idx]->w;
+      int fontHeight = fontSurface[idx]->h;
 
-      for (int y = 0 ; y <fontSurface[idx]->h ; y++ ) {
+      for (int y = 0 ; y < fontHeight ; y++ ) {
+        if (i+y >= height) break;
+        if (j+ fontWidth >= width) continue;
         memcpy( dst + (i + y) * texturePitch + j * 4,
               src + fontSurface[idx]->pitch * y,
-              fontSurface[idx]->w * 4);
+              fontWidth * 4);
       }
     }
   }
