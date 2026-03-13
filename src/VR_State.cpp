@@ -3,11 +3,13 @@
 VideoReaderState::VideoReaderState(std::string videoPath, int scaler_width, int scaler_height) {
   VideoReaderState::scaler_width = scaler_width;
   VideoReaderState::scaler_height = scaler_height;
+
+  if (videoPath == "/dev/video0")
+    VideoReaderState::webcam = true;
+
   if (!VideoReaderState::video_reader_open(videoPath)) {
     exit(1);
   }
-  if (videoPath == "/dev/video0")
-    VideoReaderState::webcam = true;
 }
 
 VideoReaderState::~VideoReaderState() {
