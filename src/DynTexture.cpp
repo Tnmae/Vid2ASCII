@@ -31,7 +31,7 @@ void StreamingTexture::lockTexture() {
   }
 }
 
-void StreamingTexture::copyPixels(uint8_t *frameBuffer, int height, int width, std::vector<SDL_Surface*> fontSurface) {
+void StreamingTexture::copyPixels(uint8_t* frameBuffer, int height, int width, std::vector<SDL_Surface*> fontSurface) {
   memset(texturePixels, 0 , texturePitch * height);
   if (!frameBuffer || !texturePixels)
         return;

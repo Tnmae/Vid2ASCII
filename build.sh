@@ -4,7 +4,7 @@
 if command -v pacman >/dev/null 2>&1; then
   sudo pacman -S gcc cmake sdl3 sdl3_image sdl3_ttf ffmpeg
 elif command -v apt >/dev/null 2>&1; then
-  sudo apt install g++ cmake libsdl3-dev libsdl3-image-dev libsdl3-ttf-dev ffmpeg
+  sudo apt install g++ cmake libsdl3-dev libsdl3-image-dev libsdl3-ttf-dev ffmpeg libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev pkg-config
 elif command -v dnf >/dev/null 2>&1; then
   echo "Make sure RPM Fusion is enabled in your fedora system"
   sudo dnf install gcc-c++ cmake SDL3-devel SDL3_image-devel SDL3_ttf-devel ffmpeg
@@ -30,3 +30,4 @@ cmake -S .. -B .
 make
 
 ./Vid2ASCII
+

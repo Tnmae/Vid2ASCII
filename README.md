@@ -1,4 +1,4 @@
-a video to ASCII converted using ffmpeg and SDL.
+a video to ASCII converter using ffmpeg and SDL.
 
 when building for windows,
 write
@@ -12,3 +12,4 @@ when building on linux systems,
 ./build.sh
 in terminal, also give executable permission the build script if not given already by the command
 chmod +x build.sh
+building with newer ffmpeg versions might give error in VR_State.cpp file, changing the sws_free_context() to sws_freeContext and removing the ampersand symbol before the argument will fix it.

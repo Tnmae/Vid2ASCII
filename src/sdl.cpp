@@ -69,11 +69,12 @@ void SDL_App::update( std::chrono::time_point<std::chrono::high_resolution_clock
   SDL_App::fpsCounter();
 }
 
-void SDL_App::inputHandler() {
+void SDL_App::inputHandler(std::atomic_bool &running) {
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
     if (event.type == SDL_EVENT_QUIT) {
       SDL_App::running = false;
+      running.store(false, std::memory_order_release);
     }
   }
 }

@@ -56,7 +56,7 @@ bool VideoReaderState::video_reader_open(std::string videoPath) {
     }
 
     av_dict_set(&options, "framerate", "30", 0);
-    av_dict_set(&options, "video_size", "640x360", 0);
+    av_dict_set(&options, "video_size", "640x480", 0);
     av_dict_set(&options, "pixel_format", "yuyv422", 0);
   }
 
@@ -185,43 +185,12 @@ bool VideoReaderState::decode_per_frame(uint8_t* frameBuffer) {
 
 }
 
-void VideoReaderState::pixelate_frame(uint8_t* frameBuffer) {
-  for (int y = 0 ; y < scaler_height; y = y + PIXEL_SIZE) {
-    for (int x = 0 ; x < scaler_width; x = x + PIXEL_SIZE ) {
-      double avg_red = 0;
-      double avg_green = 0;
-      double avg_blue = 0;
-      for (int i = 0 ; i < PIXEL_SIZE ; i++ ) {
-        for (int j = 0 ; j < PIXEL_SIZE ; j++ ) {
-          uint8_t red = frameBuffer[( (y + i) * scaler_width + (x + j) ) * 4 ];
-          uint8_t green = frameBuffer[( (y + i) * scaler_width + (x + j) )  * 4 + 1 ];
-          uint8_t blue = frameBuffer[( (y + i) * scaler_width + (x + j) ) * 4 + 2 ];
-          avg_red += red;
-          avg_green += green;
-          avg_blue += blue;
-        }
-      }
-      avg_red = (avg_red + avg_green + avg_blue) / (PIXEL_SIZE * PIXEL_SIZE * 3);
-      //avg_green = avg_green / (PIXEL_SIZE * PIXEL_SIZE);
-      //avg_blue = avg_blue / (PIXEL_SIZE * PIXEL_SIZE);
-      for (int i = 0 ; i < PIXEL_SIZE ; i++ ) {
-        for (int j = 0 ; j < PIXEL_SIZE ; j++ ) {
-          frameBuffer[( (y + i) * scaler_width  + (x + j) ) * 4 ] = (uint8_t)avg_red;
-          frameBuffer[( (y + i) * scaler_width  + (x + j) ) * 4 + 1 ] = (uint8_t)avg_red;
-          frameBuffer[( (y + i) * scaler_width  + (x + j) ) * 4  + 2 ] = (uint8_t)avg_red;
-        }
-      }
-    }
-  }
-
-}
 
 double VideoReaderState::getVideoFPS() {
   return av_q2d(avformat_ctx->streams[video_stream_idx]->r_frame_rate);
 }
 
 void VideoReaderState::video_display_frame(SDL_Renderer* renderer, uint8_t* frameBuffer, std::vector<SDL_Surface* > fontSurface, StreamingTexture* strmText) {
-  pixelate_frame(frameBuffer);
   strmText->lockTexture();
   strmText->copyPixels(frameBuffer, scaler_height, scaler_width, fontSurface);
   strmText->unlockTexture();

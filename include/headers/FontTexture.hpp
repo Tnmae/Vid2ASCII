@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <atomic>
+#include <thread>
 
 #define PIXEL_SIZE 10
 

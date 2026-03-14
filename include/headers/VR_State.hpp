@@ -34,7 +34,6 @@ private:
   AVFrame* av_frame;
   AVPacket* av_packet;
   SwsContext* sws_scaler_ctx;
-  void pixelate_frame(uint8_t* frameBuffer);
   bool webcam = false;
 };
 

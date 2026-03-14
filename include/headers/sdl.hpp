@@ -16,7 +16,7 @@ public:
   bool getStatus();
   void setFPS(int FPS);
   void update( std::chrono::time_point<std::chrono::high_resolution_clock> frame_start, SDL_Texture* texture);
-  void inputHandler();
+  void inputHandler(std::atomic_bool &running);
   void fpsLimiter(std::chrono::time_point<std::chrono::high_resolution_clock> frame_start);
   void fpsCounter();
   void appStartTimer();
