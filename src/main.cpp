@@ -13,8 +13,10 @@ std::atomic_bool decoded_frame_ready = true;
 
 void frame_decoder(VideoReaderState &vr_state, uint8_t* backBuffer) {
   while (running) {
-    if (decoded_frame_ready.load())
+    if (decoded_frame_ready.load(std::memory_order_acquire)) {
+      std::this_thread::yield();
       continue;
+    }
 
     backbuffer_ready.store(false, std::memory_order_release);
     if (!(vr_state.decode_per_frame(backBuffer))) {
@@ -28,8 +30,10 @@ void frame_decoder(VideoReaderState &vr_state, uint8_t* backBuffer) {
 
 void post_processing_function(uint8_t* backBuffer, int width, int height, int glyph_size) {
   while (running) {
-    if (backbuffer_ready.load(std::memory_order_acquire))
+    if (backbuffer_ready.load(std::memory_order_acquire)) {
+      std::this_thread::yield();
       continue;
+    }
 
     if (decoded_frame_ready.load(std::memory_order_acquire)) {
       filters::pixelate_frame(backBuffer, width, height, glyph_size);
@@ -90,8 +94,8 @@ int main(int argc, char *argv[]) {
     videoPath = std::string("/dev/video0");
   }
 
-  uint8_t frameBuffer[WIDTH * HEIGHT * 4];
-  uint8_t backBuffer[WIDTH * HEIGHT * 4];
+  std::vector<uint8_t> frameBuffer(WIDTH*HEIGHT*4);
+  std::vector<uint8_t> backBuffer(WIDTH*HEIGHT*4);
 
   SDL_App app_instance(title, WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE);
 
@@ -111,7 +115,7 @@ int main(int argc, char *argv[]) {
 
   app_instance.appStartTimer();
 
-  if (!vr_state.decode_per_frame(backBuffer)) {
+  if (!vr_state.decode_per_frame(backBuffer.data())) {
     return EXIT_FAILURE;
   }
 
@@ -120,9 +124,9 @@ int main(int argc, char *argv[]) {
   auto start = std::chrono::high_resolution_clock::now();
 
   // TODO: implement pipelining
-  std::thread post_processing_thread(post_processing_function, backBuffer, app_instance.getWindowWidth(), app_instance.getWindowHeight(), PIXEL_SIZE);
+  std::thread post_processing_thread(post_processing_function, backBuffer.data(), app_instance.getWindowWidth(), app_instance.getWindowHeight(), PIXEL_SIZE);
 
-  std::thread frame_decoder_thread(frame_decoder, std::ref(vr_state), backBuffer);
+  std::thread frame_decoder_thread(frame_decoder, std::ref(vr_state), backBuffer.data());
 
   while (app_instance.getStatus()) {
 
@@ -131,12 +135,13 @@ int main(int argc, char *argv[]) {
     auto frame_start = std::chrono::high_resolution_clock::now();
 
     if (backbuffer_ready.load(std::memory_order_acquire)) {
-      memcpy(frameBuffer, backBuffer, sizeof(frameBuffer));
+      frameBuffer = backBuffer;
       decoded_frame_ready.store(false, std::memory_order_release);
+      backbuffer_ready.store(true, std::memory_order_release);
       frame_count++;
     }
 
-    vr_state.video_display_frame(app_instance.getRenderer(), frameBuffer, fontCache.getGlyphCache(), &strmText);
+    vr_state.video_display_frame(app_instance.getRenderer(), frameBuffer.data(), fontCache.getGlyphCache(), &strmText);
 
     app_instance.update(frame_start, strmText.getDynTexture());
 
