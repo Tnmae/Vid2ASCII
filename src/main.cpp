@@ -3,16 +3,20 @@
 #include "DynTexture.hpp"
 #include "filters.hpp"
 
-#define WIDTH 1280
-#define HEIGHT 720
+#define WIDTH 900
+#define HEIGHT 600
 
 std::atomic_bool backbuffer_ready = false;
 std::atomic_bool running = true;
 
-std::atomic_bool decoded_frame_ready = false;
+std::atomic_bool decoded_frame_ready = true;
 
 void frame_decoder(VideoReaderState &vr_state, uint8_t* backBuffer) {
   while (running) {
+    if (decoded_frame_ready.load())
+      continue;
+
+    backbuffer_ready.store(false, std::memory_order_release);
     if (!(vr_state.decode_per_frame(backBuffer))) {
       return;
     }
@@ -24,13 +28,13 @@ void frame_decoder(VideoReaderState &vr_state, uint8_t* backBuffer) {
 
 void post_processing_function(uint8_t* backBuffer, int width, int height, int glyph_size) {
   while (running) {
+    if (backbuffer_ready.load(std::memory_order_acquire))
+      continue;
 
-    if (decoded_frame_ready.load()) {
+    if (decoded_frame_ready.load(std::memory_order_acquire)) {
       filters::pixelate_frame(backBuffer, width, height, glyph_size);
+      backbuffer_ready.store(true, std::memory_order_release);
     }
-
-    backbuffer_ready.store(true, std::memory_order_release);
-
   }
 }
 
@@ -68,15 +72,15 @@ int main(int argc, char *argv[]) {
 
   for (int i = 1 ; i < argc ; i++ ) {
     std::string arg = argv[i];
-    if (arg == "--path" || arg == "-p" || arg == "--p")
+    if (arg == "--path" || arg == "-p")
       videoPath = argv[i+1];
-    else if (arg == "--webcam" || arg == "--w" || arg == "-w" )
+    else if (arg == "--webcam" || arg == "-w" )
       webcam = true;
-    else if (arg == "--font" || arg == "--f" || arg == "-f")
+    else if (arg == "--font" || arg == "-f")
       ttfPath = argv[i+1];
     else if (arg == "--framerate")
       framerate = std::stoi(argv[i+1]);
-    else if (arg == "--help" || arg == "--h" || arg == "-h") {
+    else if (arg == "--help" || arg == "-h") {
       print_help(program);
       return EXIT_SUCCESS;
     }
@@ -111,8 +115,12 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+
+  int frame_count = 0;
+  auto start = std::chrono::high_resolution_clock::now();
+
   // TODO: implement pipelining
-  std::thread post_processing_thread(post_processing_function, backBuffer, app_instance.getWindowWidth(), app_instance.getWindowHeight(), PIXEL_SIZE); 
+  std::thread post_processing_thread(post_processing_function, backBuffer, app_instance.getWindowWidth(), app_instance.getWindowHeight(), PIXEL_SIZE);
 
   std::thread frame_decoder_thread(frame_decoder, std::ref(vr_state), backBuffer);
 
@@ -123,19 +131,22 @@ int main(int argc, char *argv[]) {
     auto frame_start = std::chrono::high_resolution_clock::now();
 
     if (backbuffer_ready.load(std::memory_order_acquire)) {
-
       memcpy(frameBuffer, backBuffer, sizeof(frameBuffer));
-      backbuffer_ready.store(false, std::memory_order_release);
-
-      if (decoded_frame_ready.load(std::memory_order_acquire)) {
-        decoded_frame_ready.store(false, std::memory_order_release);
-      }
+      decoded_frame_ready.store(false, std::memory_order_release);
+      frame_count++;
     }
 
     vr_state.video_display_frame(app_instance.getRenderer(), frameBuffer, fontCache.getGlyphCache(), &strmText);
 
     app_instance.update(frame_start, strmText.getDynTexture());
 
+    auto end = std::chrono::high_resolution_clock::now();
+    auto time_elapsed = std::chrono::duration<double>(end - start).count();
+    if (time_elapsed >= 1.0f) {
+      std::cout << "fps : " << frame_count/time_elapsed << '\n';
+      frame_count = 0;
+      start = end;
+    }
   }
 
   post_processing_thread.join();

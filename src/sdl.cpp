@@ -66,7 +66,7 @@ void SDL_App::update( std::chrono::time_point<std::chrono::high_resolution_clock
   SDL_RenderTexture(gRenderer, texture, NULL, &(SDL_App::frameRect));
   SDL_RenderPresent(gRenderer);
   SDL_App::fpsLimiter(frame_start);
-  SDL_App::fpsCounter();
+  //SDL_App::fpsCounter();
 }
 
 void SDL_App::inputHandler(std::atomic_bool &running) {
