@@ -2,45 +2,89 @@
 #include "VR_State.hpp"
 #include "DynTexture.hpp"
 #include "filters.hpp"
+#include <condition_variable>
 
-#define WIDTH 900
-#define HEIGHT 600
+#define WIDTH 1920
+#define HEIGHT 1080
 
 std::atomic_bool backbuffer_ready = false;
 std::atomic_bool running = true;
 
 std::atomic_bool decoded_frame_ready = true;
 
-void frame_decoder(VideoReaderState &vr_state, uint8_t* backBuffer) {
-  while (running) {
-    if (decoded_frame_ready.load(std::memory_order_acquire)) {
-      std::this_thread::yield();
-      continue;
+
+struct PipelineState {
+    std::mutex mtx;
+    std::condition_variable cv_decode;
+    std::condition_variable cv_process;
+
+    bool decoded_ready = false;
+    bool processed_ready = false;
+};
+
+
+void frame_decoder(VideoReaderState &vr_state,
+                   std::vector<uint8_t> &decodeBuffer,
+                   PipelineState &state)
+{
+    while (running) {
+
+        std::unique_lock lock(state.mtx);
+
+        state.cv_decode.wait(lock, [&]{
+            return !state.decoded_ready || !running;
+        });
+
+        if (!running) return;
+
+        lock.unlock();
+
+        if (!vr_state.decode_per_frame(decodeBuffer.data()))
+            return;
+
+        lock.lock();
+
+        state.decoded_ready = true;
+
+        lock.unlock();
+        state.cv_process.notify_one();
     }
-
-    backbuffer_ready.store(false, std::memory_order_release);
-    if (!(vr_state.decode_per_frame(backBuffer))) {
-      return;
-    }
-
-    decoded_frame_ready.store(true, std::memory_order_release);
-
-  }
 }
 
-void post_processing_function(uint8_t* backBuffer, int width, int height, int glyph_size) {
-  while (running) {
-    if (backbuffer_ready.load(std::memory_order_acquire)) {
-      std::this_thread::yield();
-      continue;
-    }
 
-    if (decoded_frame_ready.load(std::memory_order_acquire)) {
-      filters::pixelate_frame(backBuffer, width, height, glyph_size);
-      backbuffer_ready.store(true, std::memory_order_release);
+void post_processing_function(std::vector<uint8_t> &decodeBuffer,
+                              std::vector<uint8_t> &processBuffer,
+                              int width,
+                              int height,
+                              int glyph_size,
+                              PipelineState &state)
+{
+    while (running) {
+
+        std::unique_lock lock(state.mtx);
+
+        state.cv_process.wait(lock, [&]{
+            return state.decoded_ready || !running;
+        });
+
+        if (!running) return;
+
+        processBuffer.swap(decodeBuffer);
+
+        state.decoded_ready = false;
+
+        lock.unlock();
+        state.cv_decode.notify_one();
+
+        filters::pixelate_frame(processBuffer.data(), width, height, glyph_size);
+
+        lock.lock();
+        state.processed_ready = true;
+        lock.unlock();
     }
-  }
 }
+
+
 
 void print_help(std::string program) {
     std::cout << "Usage: " << program << " [options]\n\n";
@@ -94,8 +138,9 @@ int main(int argc, char *argv[]) {
     videoPath = std::string("/dev/video0");
   }
 
+  std::vector<uint8_t> decodeBuffer(WIDTH*HEIGHT*4);
+  std::vector<uint8_t> processBuffer(WIDTH*HEIGHT*4);
   std::vector<uint8_t> frameBuffer(WIDTH*HEIGHT*4);
-  std::vector<uint8_t> backBuffer(WIDTH*HEIGHT*4);
 
   SDL_App app_instance(title, WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE);
 
@@ -115,7 +160,7 @@ int main(int argc, char *argv[]) {
 
   app_instance.appStartTimer();
 
-  if (!vr_state.decode_per_frame(backBuffer.data())) {
+  if (!vr_state.decode_per_frame(decodeBuffer.data())) {
     return EXIT_FAILURE;
   }
 
@@ -124,9 +169,24 @@ int main(int argc, char *argv[]) {
   auto start = std::chrono::high_resolution_clock::now();
 
   // TODO: implement pipelining
-  std::thread post_processing_thread(post_processing_function, backBuffer.data(), app_instance.getWindowWidth(), app_instance.getWindowHeight(), PIXEL_SIZE);
-
-  std::thread frame_decoder_thread(frame_decoder, std::ref(vr_state), backBuffer.data());
+  PipelineState pipeline;
+  
+  std::thread decoder_thread(
+      frame_decoder,
+      std::ref(vr_state),
+      std::ref(decodeBuffer),
+      std::ref(pipeline)
+  );
+  
+  std::thread filter_thread(
+      post_processing_function,
+      std::ref(decodeBuffer),
+      std::ref(processBuffer),
+      WIDTH,
+      HEIGHT,
+      PIXEL_SIZE,
+      std::ref(pipeline)
+  );
 
   while (app_instance.getStatus()) {
 
@@ -134,11 +194,12 @@ int main(int argc, char *argv[]) {
 
     auto frame_start = std::chrono::high_resolution_clock::now();
 
-    if (backbuffer_ready.load(std::memory_order_acquire)) {
-      frameBuffer = backBuffer;
-      decoded_frame_ready.store(false, std::memory_order_release);
-      backbuffer_ready.store(true, std::memory_order_release);
-      frame_count++;
+
+    if (pipeline.processed_ready)
+    {
+        frameBuffer.swap(processBuffer);
+    
+        pipeline.processed_ready = false;
     }
 
     vr_state.video_display_frame(app_instance.getRenderer(), frameBuffer.data(), fontCache.getGlyphCache(), &strmText);
@@ -154,8 +215,8 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  post_processing_thread.join();
-  frame_decoder_thread.join();
+  filter_thread.join();
+  decoder_thread.join();
 
   return EXIT_SUCCESS;
 }

@@ -10,7 +10,7 @@
 #include <atomic>
 #include <thread>
 
-#define PIXEL_SIZE 10
+#define PIXEL_SIZE 15
 
 static char luminosity[] = " .:-=+*#%@";
 
