@@ -77,7 +77,7 @@ void SDL_App::inputHandler(std::atomic_bool &running) {
       running.store(false, std::memory_order_release);
     }
     if (event.type == SDL_EVENT_WINDOW_RESIZED) {
-      SDL_GetWindowSize(gWindow, &width, &height);
+      SDL_GetWindowSize(gWindow, (int*)&width, (int*)&height);
       std::cout << "Window resized to width: " << width << " and height : " << height << '\n';
     }
   }
