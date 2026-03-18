@@ -11,5 +11,6 @@ set "var2=%cd%"
 set "PATH=%PATH%;C:\Program Files (x86)\GnuWin32\bin"
 
 cd build
+cmake -G "MinGW Makefiles" -S .. -B .
 cmake --build .
 echo cd into build directory to run executable

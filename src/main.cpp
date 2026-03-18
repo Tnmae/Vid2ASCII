@@ -3,8 +3,8 @@
 #include "DynTexture.hpp"
 #include "filters.hpp"
 
-#define WIDTH 900
-#define HEIGHT 600
+#define WIDTH 1080
+#define HEIGHT 720
 
 std::atomic_bool backbuffer_ready = false;
 std::atomic_bool running = true;
@@ -48,6 +48,7 @@ void print_help(std::string program) {
     std::cout << "Options:\n";
     std::cout << "  -p, --path <file>           Path to video file\n";
     std::cout << "  -w, --webcam                Use webcam as input\n";
+    std::cout << "  -d, --device                specify a  webcam device to use, mainly for windows\n";
     std::cout << "  -f, --font <file>           Path to TTF font\n";
     std::cout << "  --framerate <framerate>     to specify framerate for the video to be played\n";
     //std::cout << "  --save                      to save video output\n";
@@ -64,7 +65,7 @@ int main(int argc, char *argv[]) {
   std::string title = "Video to ASCII Converter";
   bool webcam = false;
   std::string ttfPath = "../resources/Roboto-Regular.ttf";
-  std::string videoPath;
+  std::string video;
   int framerate = 0;
   
   std::string program = "./Video2ASCII";
@@ -77,21 +78,30 @@ int main(int argc, char *argv[]) {
   for (int i = 1 ; i < argc ; i++ ) {
     std::string arg = argv[i];
     if (arg == "--path" || arg == "-p")
-      videoPath = argv[i+1];
+      video = argv[i+1];
     else if (arg == "--webcam" || arg == "-w" )
       webcam = true;
     else if (arg == "--font" || arg == "-f")
       ttfPath = argv[i+1];
     else if (arg == "--framerate")
       framerate = std::stoi(argv[i+1]);
+    else if (arg == "--device" || arg == "-d") {
+      std::string temp;
+      webcam = true;
+      for (int j = i+1 ; j < argc ; j++) {
+        std::string localArg = std::string(argv[j]);
+        if (localArg[0] == '-') break;
+        temp += std::string(" ") + localArg;
+      }
+      video = temp.substr(1, temp.size());
+    }
+    else if (arg == "--save") {
+      // TO BE IMPLEMENTED
+    }
     else if (arg == "--help" || arg == "-h") {
       print_help(program);
       return EXIT_SUCCESS;
     }
-  }
-
-  if (webcam) {
-    videoPath = std::string("/dev/video0");
   }
 
   std::vector<uint8_t> frameBuffer(WIDTH*HEIGHT*4);
@@ -103,7 +113,7 @@ int main(int argc, char *argv[]) {
   fontCache.build_glyph_cache(app_instance.getRenderer());
   
 
-  VideoReaderState vr_state(videoPath, app_instance.getWindowWidth(), app_instance.getWindowHeight());
+  VideoReaderState vr_state(video, webcam, app_instance.getWindowWidth(), app_instance.getWindowHeight());
   
   // framerate
   framerate = (framerate) ? framerate : vr_state.getVideoFPS();

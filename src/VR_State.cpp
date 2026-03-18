@@ -1,13 +1,13 @@
 #include "../include/headers/VR_State.hpp"
 
-VideoReaderState::VideoReaderState(std::string videoPath, int scaler_width, int scaler_height) {
+VideoReaderState::VideoReaderState(std::string video, bool webcam,  int scaler_width, int scaler_height) {
   VideoReaderState::scaler_width = scaler_width;
   VideoReaderState::scaler_height = scaler_height;
 
-  if (videoPath == "/dev/video0")
+  if (webcam)
     VideoReaderState::webcam = true;
 
-  if (!VideoReaderState::video_reader_open(videoPath)) {
+  if (!VideoReaderState::video_reader_open(video)) {
     exit(1);
   }
 }
@@ -31,9 +31,44 @@ VideoReaderState::~VideoReaderState() {
   }
 }
 
-bool VideoReaderState::video_reader_open(std::string videoPath) {
+
+void VideoReaderState::FindDevice(const AVInputFormat*& av_input_fmt, AVDictionary*& options) {
+  if (!webcam) return;
+
   avdevice_register_all();
 
+#ifdef _WIN32
+    do {
+      av_input_fmt = av_input_video_device_next(av_input_fmt);
+    }while (av_input_fmt != nullptr && strcmp(av_input_fmt->name, "dshow"));
+
+    if (!av_input_fmt) {
+      std::cout << "Couldn't find AVInputFormat to get webcam\n";
+      return;
+    }
+
+    av_dict_set(&options, "rtbufsize", "100M", 0);
+    av_dict_set(&options, "framerate", "30", 0);
+    av_dict_set(&options, "video_size", "640x480", 0);
+
+#elif __linux__
+    do {
+      av_input_fmt = av_input_video_device_next(av_input_fmt);
+    }while (av_input_fmt != nullptr && strcmp(av_input_fmt->name, "video4linux,v4l2"));
+
+    if (!av_input_fmt) {
+      std::cout << "Couldn't find AVInputFormat to get webcam\n";
+      return;
+    }
+
+    av_dict_set(&options, "framerate", "30", 0);
+    av_dict_set(&options, "video_size", "640x480", 0);
+    av_dict_set(&options, "pixel_format", "yuyv422", 0);
+#endif
+}
+
+
+bool VideoReaderState::AllocateFormatCtx() {
   avformat_ctx = avformat_alloc_context();
 
   if (!avformat_ctx) {
@@ -41,43 +76,32 @@ bool VideoReaderState::video_reader_open(std::string videoPath) {
     return false;
   }else {
     std::cout << "format context created successfully\n";
+    return true;
   }
+}
 
-  const AVInputFormat* av_input_fmt = NULL;
-  AVDictionary* options = NULL;
-  if (webcam) {
-    do {
-      av_input_fmt = av_input_video_device_next(av_input_fmt);
-    }while (av_input_fmt != nullptr && strcmp(av_input_fmt->name, "video4linux2,v4l2"));
-
-    if (!av_input_fmt) {
-      std::cout << "Couldn't find AVInputFormat to get webcam\n";
-      return false;
-    }
-
-    av_dict_set(&options, "framerate", "30", 0);
-    av_dict_set(&options, "video_size", "640x480", 0);
-    av_dict_set(&options, "pixel_format", "yuyv422", 0);
-  }
-
-  if (avformat_open_input(&avformat_ctx, videoPath.c_str(), av_input_fmt, &options) < 0) {
+bool VideoReaderState::FormatOpenInput(std::string video, const AVInputFormat* av_input_fmt, AVDictionary* options) {
+  if (avformat_open_input(&avformat_ctx, video.c_str(), av_input_fmt, &options) < 0) {
     std::cerr << "error opening video file\n";
     return false;
   }else {
     std::cout << "video frame loaded successfully\n";
+    return true;
   }
+}
 
+bool VideoReaderState::FindStreamInfo() {
   if (avformat_find_stream_info(avformat_ctx, NULL) < 0) {
     std::cerr << "could not find stream info\n";
     return false;
   }else {
     std::cout << "stream info found\n";
+    return true;
   }
+}
 
-  video_stream_idx = -1;
 
-  AVCodecParameters* av_codec_params;
-  const AVCodec* avcodec;
+bool VideoReaderState::FindVideoStreamIdx(AVCodecParameters*& av_codec_params, const AVCodec*& avcodec) {
   int stream_num = avformat_ctx->nb_streams;
   for (int i = 0 ; i < stream_num ; i++ ) {
     AVStream* av_stream = avformat_ctx->streams[i];
@@ -98,52 +122,118 @@ bool VideoReaderState::video_reader_open(std::string videoPath) {
     return false;
   }else {
     std::cout << "video stream index is at: " << video_stream_idx << '\n';
+    return true;
   }
+}
 
+
+bool VideoReaderState::AllocateCodecCtx(const AVCodec* avcodec) {
   avcodec_ctx = avcodec_alloc_context3(avcodec);
-
   if (!avcodec_ctx) {
     std::cerr << "could not allocate context for codec\n";
     return false;
   }else {
     std::cout << "context for codec allocated\n";
+    return true;
   }
+}
 
+
+bool VideoReaderState::ParamsToCtx(AVCodecParameters* av_codec_params, const AVCodec* avcodec) {
   if (avcodec_parameters_to_context(avcodec_ctx, av_codec_params) < 0) {
     std::cerr << "could not initialize AVCodec context\n";
     return false;
   }else {
     std::cout << "Initialized AVCodec context\n";
+    return true;
   }
+}
 
+bool VideoReaderState::OpenCodecCtx(const AVCodec* avcodec) {
   if (avcodec_open2(avcodec_ctx, avcodec, NULL)) {
     std::cerr << "Could not open context\n";
     return false;
   }else {
     std::cout << "Opened context successfully\n";
+    return true;
   }
+}
 
+bool VideoReaderState::AllocateFrame(const AVCodec* avcodec) {
   av_frame = av_frame_alloc();
   if (!av_frame) {
     std::cerr << "could not allocate frame\n";
     return false;
   }else {
     std::cout << "allocated frame\n";
+    return true;
   }
+}
 
+
+bool VideoReaderState::AllocatePacket() {
   av_packet = av_packet_alloc();
   if (!av_packet) {
     std::cerr << "could not allocate packet\n";
     return false;
   }else {
     std::cout << "allocated packet\n";
+    return true;
   }
-  
+}
+
+
+bool VideoReaderState::GetScalerCtx() {
   sws_scaler_ctx = sws_getContext(frame_width, frame_height, avcodec_ctx->pix_fmt, scaler_width, scaler_height, AV_PIX_FMT_RGB0, SWS_FAST_BILINEAR, NULL, NULL, NULL);
   if (!sws_scaler_ctx) {
     std::cerr << "could not allocate scaler context\n";
     return false;
+  }else {
+    std::cout << "scaler context allocated\n";
+    return true;
   }
+}
+
+
+bool VideoReaderState::video_reader_open(std::string video) {
+
+  if (!AllocateFormatCtx())
+    return false;
+
+  const AVInputFormat* av_input_fmt = NULL;
+  AVDictionary* options = NULL;
+
+  FindDevice(av_input_fmt, options);
+
+  if (!FormatOpenInput(video, av_input_fmt, options))
+    return false;
+
+  if (!FindStreamInfo())
+    return false;
+
+  AVCodecParameters* av_codec_params;
+  const AVCodec* avcodec;
+
+  if (!FindVideoStreamIdx(av_codec_params, avcodec))
+    return false;
+
+  if (!AllocateCodecCtx(avcodec))
+    return false;
+
+  if (!ParamsToCtx(av_codec_params, avcodec))
+    return false;
+
+  if (!OpenCodecCtx(avcodec))
+    return false;
+
+  if (!AllocateFrame(avcodec))
+    return false;
+
+  if (!AllocatePacket())
+    return false;
+  
+  if (!GetScalerCtx())
+    return false;
 
   return true;
 
@@ -187,7 +277,7 @@ bool VideoReaderState::decode_per_frame(uint8_t* frameBuffer) {
 
 
 double VideoReaderState::getVideoFPS() {
-  return av_q2d(avformat_ctx->streams[video_stream_idx]->r_frame_rate);
+  return av_q2d(avformat_ctx->streams[video_stream_idx]->avg_frame_rate);
 }
 
 void VideoReaderState::video_display_frame(SDL_Renderer* renderer, uint8_t* frameBuffer, std::vector<SDL_Surface* > fontSurface, StreamingTexture* strmText) {
