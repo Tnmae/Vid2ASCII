@@ -2,7 +2,7 @@
 
 A real-time video to ASCII art converter built with C++, FFmpeg, and SDL3. It decodes video frames (or a live webcam feed), maps pixel luminosity to ASCII characters, and renders the result in an SDL3 window using a TTF font.
 
-![demo placeholder](resources/demo.gif)
+![demo placeholder](demo/demo.gif)
 
 ## How it works
 
