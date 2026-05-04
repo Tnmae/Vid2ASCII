@@ -60,6 +60,8 @@ void print_help(std::string program) {
 }
 
 
+/* Sample line to check if the git push action will work*/
+
 int main(int argc, char *argv[]) {
 
   std::string title = "Video to ASCII Converter";
