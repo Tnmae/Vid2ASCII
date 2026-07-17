@@ -1,7 +1,6 @@
 @echo off
 setlocal
 
-del CMakeLists{Linux}.txt
 del build.sh
 
 #add script to add a check if the make existing in user's system is linux make or gnu win32 make
