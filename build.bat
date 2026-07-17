@@ -4,7 +4,7 @@ setlocal
 set "var1=%cd%"
 set "PATH=%PATH%;%var1%\mingw64\bin\"
 
-set "PATH=%PATH%;%var2%\cmake\bin\"
+set "PATH=%PATH%;%var1%\cmake\bin\"
 
 set "PATH=%PATH%;C:\Program Files (x86)\GnuWin32\bin"
 
