@@ -35,18 +35,6 @@ if %ERRORLEVEL% == 1 (
     echo cmake is preinstalled!!!
 )
 
-where make >nul 2>&1
-if %ERRORLEVEL% == 1 (
-    echo make not found in path. Handling download
-    curl -L -o make-3.80.exe https://gnuwin32.sourceforge.net/downlinks/make.php
-    .\make-3.80.exe
-    del make-3.80.exe
-    set "PATH=%PATH%;C:\Program Files (x86)\GnuWin32\bin"
-    echo make install complete
-)else (
-    echo make is preinstalled!!
-)
-
 set "Folder=.\include\ffmpeg-8.0"
 
 echo For the first build, ffmpeg has to be setup, won't be downloaded again for subsequent builds
